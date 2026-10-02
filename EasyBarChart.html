@@ -1,0 +1,2146 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Easy Bar Chart - Publication Ready Bar Charts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        #chart-svg {
+            outline: 1px solid #1e293b;
+            box-shadow: 0 3px 14px rgba(15, 23, 42, 0.35);
+        }
+
+        #chart-svg .draggable-element { cursor: move; }
+
+        .clickable-chart-element {
+            cursor: pointer;
+            transition: outline 0.15s ease, opacity 0.15s ease;
+        }
+        .clickable-chart-element:hover {
+            outline: 1.5px dashed #2563eb;
+            outline-offset: 2px;
+            opacity: 0.85;
+        }
+
+        .zoom-btn {
+            background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px;
+            padding: 2px 8px; font-size: 11px; font-weight: 600; color: #334155; line-height: 1.5;
+        }
+        .zoom-btn:hover { background: #e2e8f0; border-color: #94a3b8; }
+        .zoom-btn.active { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; }
+
+        .sci-open-btn {
+            display: inline-flex; align-items: center; gap: 4px;
+            background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 4px;
+            padding: 2px 5px; font-size: 10px; font-weight: 600; color: #334155;
+        }
+        .sci-open-btn:hover { background: #e2e8f0; border-color: #94a3b8; }
+
+        #sci-picker {
+            position: fixed; z-index: 60; width: 332px; max-height: min(70vh, 480px);
+            display: flex; flex-direction: column;
+            background: #fff; border: 1px solid #94a3b8; border-radius: 8px;
+            box-shadow: 0 10px 30px rgba(15, 23, 42, 0.28);
+        }
+        #sci-picker.hidden { display: none; }
+        
+        .rich-toolbar {
+            display: flex; align-items: center; gap: 2px; flex-wrap: wrap; margin-bottom: 3px;
+        }
+        .rich-btn {
+            background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 3px;
+            min-width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center;
+            font-size: 10px; font-weight: 600; color: #334155; cursor: pointer; user-select: none;
+            transition: all 0.1s ease;
+        }
+        .rich-btn:hover { background: #e2e8f0; border-color: #94a3b8; color: #0f172a; }
+        .rich-btn.active { background: #dbeafe; border-color: #3b82f6; color: #1d4ed8; font-weight: 700; }
+
+        .rich-field {
+            width: 100%; font-size: 11px; line-height: 1.4; padding: 2px 4px; min-height: 24px;
+            border: 1px solid #cbd5e1; border-radius: 3px; background: #fff;
+            white-space: nowrap; overflow-x: auto; overflow-y: hidden;
+        }
+        .rich-field:focus { outline: 2px solid #3b82f6; outline-offset: -1px; border-color: #3b82f6; }
+        .rich-field sub, .rich-field sup { line-height: 0; }
+        
+        .sci-picker-head {
+            display: flex; justify-between; align-items: center;
+            padding: 6px 10px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;
+            font-size: 11px; font-weight: 700; color: #475569; border-radius: 8px 8px 0 0;
+        }
+        #sci-picker-body { overflow-y: auto; min-height: 0; padding: 6px 10px 10px; }
+        .sci-group-title {
+            margin: 8px 0 3px; font-size: 10px; font-weight: 700; letter-spacing: .05em;
+            text-transform: uppercase; color: #64748b;
+        }
+        .sci-row { display: flex; flex-wrap: wrap; gap: 3px; }
+        .sci-cell {
+            min-width: 30px; height: 30px; padding: 0 6px; font-size: 14px; color: #0f172a;
+            background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 4px;
+        }
+        .sci-cell:hover { background: #dbeafe; border-color: #3b82f6; }
+
+        .field-highlight {
+            animation: highlightPulse 1.5s ease-out;
+        }
+        @keyframes highlightPulse {
+            0% { background-color: #fef08a; border-color: #eab308; }
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
+
+    <header class="bg-slate-900 text-white px-6 py-3 flex justify-between items-center shadow-md select-none">
+        <div class="flex items-center space-x-3">
+            <div class="bg-blue-600 p-2 rounded-lg text-white">
+                <i class="fa-solid fa-chart-column text-xl"></i>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold leading-tight">Easy Bar Chart</h1>
+                <p class="text-xs text-slate-400">Publication Ready Bar Charts</p>
+            </div>
+        </div>
+        
+        <div class="flex items-center space-x-2">
+            <button onclick="exportSVG()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded text-xs font-medium transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-code"></i> SVG
+            </button>
+            <button onclick="exportPDF()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-2.5 py-1.5 rounded text-xs font-medium transition flex items-center gap-1.5">
+                <i class="fa-solid fa-file-pdf"></i> PDF
+            </button>
+            <button onclick="exportPNG(300)" class="bg-blue-600 hover:bg-blue-500 text-white px-2.5 py-1.5 rounded text-xs font-medium transition shadow flex items-center gap-1.5">
+                <i class="fa-solid fa-download"></i> PNG (300 DPI)
+            </button>
+            <button onclick="exportPNG(600)" class="bg-indigo-600 hover:bg-indigo-500 text-white px-2.5 py-1.5 rounded text-xs font-medium transition shadow flex items-center gap-1.5">
+                <i class="fa-solid fa-file-image"></i> 600 DPI
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+
+        <!-- Left Sidebar Navigation & Controls -->
+        <aside id="side-panel" class="w-[28rem] max-w-[70vw] shrink-0 bg-white border-r border-slate-200 flex flex-col h-[calc(100vh-57px)] overflow-y-auto">
+            
+            <div class="flex border-b border-slate-200 bg-slate-50 sticky top-0 z-10 text-[11px] font-semibold">
+                <button onclick="switchTab('data')" id="tab-btn-data" class="flex-1 py-3 text-blue-600 border-b-2 border-blue-600 transition flex justify-center items-center gap-1">
+                    <i class="fa-solid fa-table"></i> Data
+                </button>
+                <button onclick="switchTab('style')" id="tab-btn-style" class="flex-1 py-3 text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition flex justify-center items-center gap-1">
+                    <i class="fa-solid fa-sliders"></i> Style & Presets
+                </button>
+                <button onclick="switchTab('annotations')" id="tab-btn-annotations" class="flex-1 py-3 text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition flex justify-center items-center gap-1">
+                    <i class="fa-solid fa-font"></i> Text & Labels
+                </button>
+                <button onclick="switchTab('profiles')" id="tab-btn-profiles" class="flex-1 py-3 text-slate-500 border-b-2 border-transparent hover:text-slate-700 transition flex justify-center items-center gap-1">
+                    <i class="fa-solid fa-bookmark"></i> Profiles
+                </button>
+            </div>
+
+            <!-- TAB 1: DATA INPUT -->
+            <div id="tab-data" class="p-4 space-y-3">
+                <div class="flex justify-between items-center">
+                    <label class="block text-xs font-bold uppercase tracking-wider text-slate-600">Data</label>
+                    <div class="flex gap-3">
+                        <button onclick="clearData()" class="text-xs text-slate-500 hover:text-red-600 underline font-medium">Clear Rows</button>
+                        <button onclick="loadSampleData()" class="text-xs text-blue-600 hover:text-blue-800 underline font-medium">Reset Sample Data</button>
+                    </div>
+                </div>
+                <p class="text-[11px] text-slate-500">Paste spreadsheet data into any cell (header auto-detected). Use the global formatting toolbar below for rich formatting.</p>
+
+                <!-- Global Data Table Formatting Toolbar -->
+                <div class="bg-slate-50 border border-slate-200 rounded p-1.5 space-y-1">
+                    <div class="text-[10px] font-bold text-slate-500 uppercase tracking-wide">Active Cell Formatting Bar</div>
+                    <div class="rich-toolbar" data-global-toolbar="true">
+                        <button type="button" class="rich-btn" data-cmd="bold" onmousedown="event.preventDefault(); execGlobalRichCmd('bold')" title="Bold"><b>B</b></button>
+                        <button type="button" class="rich-btn" data-cmd="italic" onmousedown="event.preventDefault(); execGlobalRichCmd('italic')" title="Italic"><i>I</i></button>
+                        <button type="button" class="rich-btn" data-cmd="underline" onmousedown="event.preventDefault(); execGlobalRichCmd('underline')" title="Underline"><u>U</u></button>
+                        <button type="button" class="rich-btn" data-cmd="subscript" onmousedown="event.preventDefault(); execGlobalRichCmd('subscript')" title="Subscript">x<sub>2</sub></button>
+                        <button type="button" class="rich-btn" data-cmd="superscript" onmousedown="event.preventDefault(); execGlobalRichCmd('superscript')" title="Superscript">x<sup>2</sup></button>
+                        <button type="button" class="rich-btn text-[10px]" data-cmd="normal" onmousedown="event.preventDefault(); execGlobalRichCmd('normal')" title="Clear Formatting">T<sub>x</sub></button>
+                        <button type="button" onmousedown="event.preventDefault()" onclick="openGlobalSciPicker(this)" class="sci-open-btn ml-auto"><span class="font-serif text-xs leading-none">&Omega;</span> Symbols</button>
+                    </div>
+                </div>
+
+                <div id="data-table-wrap" class="overflow-x-auto border border-slate-200 rounded">
+                    <table class="w-full border-collapse text-xs table-fixed">
+                        <thead id="data-table-head"></thead>
+                        <tbody id="data-table-body"></tbody>
+                    </table>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="addRow(true)" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2 py-1 rounded border border-blue-200">+ Row</button>
+                    <button onclick="addColumn()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2 py-1 rounded border border-blue-200">+ Column</button>
+                </div>
+                <p id="data-status" class="text-[11px] text-slate-500"></p>
+            </div>
+
+            <!-- TAB 2: STYLE & PRESETS -->
+            <div id="tab-style" class="p-4 space-y-5 hidden">
+                <!-- 1. Palettes & Series Customization + Gaps -->
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Palettes & Series Customization</h3>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Color Palette</label>
+                        <select id="color-palette" onchange="applyColorPalette()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <option value="colorblind" selected>Colorblind Safe</option>
+                            <option value="grayscale">Classic Grayscale</option>
+                            <option value="warm">Warm Academic</option>
+                            <option value="cool">Cool Tech</option>
+                            <option value="pastel">Muted Pastel</option>
+                        </select>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 pt-1">
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Category Gap</label>
+                            <input type="range" id="group-padding" min="0.05" max="0.75" step="0.02" value="0.25" oninput="updateChart()" class="w-full">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Sub-Bar Gap (px)</label>
+                            <input type="range" id="bar-gap" min="0" max="20" step="1" value="2" oninput="updateChart()" class="w-full">
+                        </div>
+                    </div>
+
+                    <div id="series-customizer" class="space-y-2 pt-2"></div>
+                </div>
+
+                <!-- 2. Dimensions in mm (Default 90mm) -->
+                <div class="border-t border-slate-200 pt-4 space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Dimensions (mm)</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Width (mm)</label>
+                            <input type="number" id="svg-width-mm" value="90" step="1" min="40" max="500" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Height (mm)</label>
+                            <input type="number" id="svg-height-mm" value="65" step="1" min="40" max="500" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Plot Margins in mm -->
+                <div class="border-t border-slate-200 pt-4 space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Plot Margins (mm)</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Top Margin (mm)</label>
+                            <input type="number" id="margin-top-mm" value="10" step="0.5" min="2" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Bottom Margin (mm)</label>
+                            <input type="number" id="margin-bottom-mm" value="14" step="0.5" min="5" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Left Margin (mm)</label>
+                            <input type="number" id="margin-left-mm" value="15" step="0.5" min="5" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Right Margin (mm)</label>
+                            <input type="number" id="margin-right-mm" value="6" step="0.5" min="2" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 4. Universal Line Weight & Spacing -->
+                <div class="border-t border-slate-200 pt-4 space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Universal Line Weight & Spacing</h3>
+                    
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Universal Line Weight (pt)</label>
+                        <input type="number" id="universal-stroke-width" value="1.2" min="0.2" max="5" step="0.1" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Error Cap Width (px)</label>
+                        <input type="number" id="cap-width" value="8" min="0" max="30" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: TEXT, LABELS & ANNOTATIONS -->
+            <div id="tab-annotations" class="p-4 space-y-5 hidden">
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Typography & Axis Titles</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Font Family</label>
+                            <select id="font-family" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                                <option value="Arial, Helvetica, sans-serif">Arial / Helvetica</option>
+                                <option value="'Times New Roman', Times, serif">Times New Roman</option>
+                                <option value="Calibri, 'Segoe UI', sans-serif">Calibri</option>
+                                <option value="Georgia, serif">Georgia</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-medium text-slate-600 mb-1">Base Size (pt)</label>
+                            <input type="number" id="font-size" value="11" min="6" max="24" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+
+                    <!-- Y-Axis Title Input with Toolbar -->
+                    <div id="y-title-wrapper" class="p-1 rounded">
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Y-Axis Title</label>
+                        <div class="rich-toolbar" data-target="y-title">
+                            <button type="button" class="rich-btn" data-cmd="bold" onmousedown="event.preventDefault(); execRichCmd('y-title', 'bold')" title="Bold"><b>B</b></button>
+                            <button type="button" class="rich-btn" data-cmd="italic" onmousedown="event.preventDefault(); execRichCmd('y-title', 'italic')" title="Italic"><i>I</i></button>
+                            <button type="button" class="rich-btn" data-cmd="underline" onmousedown="event.preventDefault(); execRichCmd('y-title', 'underline')" title="Underline"><u>U</u></button>
+                            <button type="button" class="rich-btn" data-cmd="subscript" onmousedown="event.preventDefault(); execRichCmd('y-title', 'subscript')" title="Subscript">x<sub>2</sub></button>
+                            <button type="button" class="rich-btn" data-cmd="superscript" onmousedown="event.preventDefault(); execRichCmd('y-title', 'superscript')" title="Superscript">x<sup>2</sup></button>
+                            <button type="button" class="rich-btn text-[10px]" data-cmd="normal" onmousedown="event.preventDefault(); execRichCmd('y-title', 'normal')" title="Clear Formatting">T<sub>x</sub></button>
+                            <button type="button" onmousedown="event.preventDefault()" onclick="openSciPicker('y-title', this)" class="sci-open-btn ml-auto"><span class="font-serif text-xs leading-none">&Omega;</span> Symbols</button>
+                        </div>
+                        <div id="y-title" data-rich contenteditable="true" spellcheck="false" oninput="updateChart()" class="rich-field"></div>
+                    </div>
+
+                    <!-- X-Axis Title Input with Toolbar -->
+                    <div id="x-title-wrapper" class="p-1 rounded">
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">X-Axis Title</label>
+                        <div class="rich-toolbar" data-target="x-title">
+                            <button type="button" class="rich-btn" data-cmd="bold" onmousedown="event.preventDefault(); execRichCmd('x-title', 'bold')" title="Bold"><b>B</b></button>
+                            <button type="button" class="rich-btn" data-cmd="italic" onmousedown="event.preventDefault(); execRichCmd('x-title', 'italic')" title="Italic"><i>I</i></button>
+                            <button type="button" class="rich-btn" data-cmd="underline" onmousedown="event.preventDefault(); execRichCmd('x-title', 'underline')" title="Underline"><u>U</u></button>
+                            <button type="button" class="rich-btn" data-cmd="subscript" onmousedown="event.preventDefault(); execRichCmd('x-title', 'subscript')" title="Subscript">x<sub>2</sub></button>
+                            <button type="button" class="rich-btn" data-cmd="superscript" onmousedown="event.preventDefault(); execRichCmd('x-title', 'superscript')" title="Superscript">x<sup>2</sup></button>
+                            <button type="button" class="rich-btn text-[10px]" data-cmd="normal" onmousedown="event.preventDefault(); execRichCmd('x-title', 'normal')" title="Clear Formatting">T<sub>x</sub></button>
+                            <button type="button" onmousedown="event.preventDefault()" onclick="openSciPicker('x-title', this)" class="sci-open-btn ml-auto"><span class="font-serif text-xs leading-none">&Omega;</span> Symbols</button>
+                        </div>
+                        <div id="x-title" data-rich contenteditable="true" spellcheck="false" oninput="updateChart()" class="rich-field"></div>
+                    </div>
+
+                    <div class="flex items-center justify-between gap-2">
+                        <p class="text-[10px] text-slate-400">Drag either title on the figure to move it.</p>
+                        <button onclick="resetAxisTitles()" class="text-xs text-blue-600 hover:text-blue-800 underline font-medium whitespace-nowrap">Reset title positions</button>
+                    </div>
+                </div>
+
+                <!-- Y-Axis Ticks & Minor Ticks Scaling -->
+                <div id="y-scale-wrapper" class="border-t border-slate-200 pt-4 space-y-3 p-1 rounded">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Y-Axis Scale & Ticks</h3>
+                    
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-700">Show Y-Axis Ticks</label>
+                        <input type="checkbox" id="y-ticks-show" checked onchange="updateChart()" class="rounded text-blue-600">
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Y Min</label>
+                            <input type="number" id="y-min" placeholder="Auto" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Y Max</label>
+                            <input type="number" id="y-max" placeholder="Auto" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Tick Step</label>
+                            <input type="number" id="y-step" placeholder="Auto" step="any" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">Y-Tick Direction</label>
+                            <select id="tick-direction" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                                <option value="outer" selected>Outer (Standard)</option>
+                                <option value="inner">Inner</option>
+                                <option value="both">Both Sides</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">Y-Tick Length (px)</label>
+                            <input type="number" id="tick-length" value="4" min="1" max="15" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+
+                    <div class="space-y-2 border-t border-slate-100 pt-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-xs font-medium text-slate-700">Enable Minor Y-Ticks</label>
+                            <input type="checkbox" id="minor-ticks-show" onchange="updateChart()" class="rounded text-blue-600">
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500">Subdivisions per Interval</label>
+                                <select id="minor-tick-count" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                                    <option value="1">1 (Half-way)</option>
+                                    <option value="3" selected>4 (Quarters)</option>
+                                    <option value="4">5 (Fifth-parts)</option>
+                                    <option value="9">10 (Tenths)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500">Minor Tick Length (px)</label>
+                                <input type="number" id="minor-tick-length" value="2.5" min="0.5" max="10" step="0.5" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- X-Axis Scale & Ticks Section -->
+                <div id="x-scale-wrapper" class="border-t border-slate-200 pt-4 space-y-3 p-1 rounded">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">X-Axis Scale & Ticks</h3>
+                    
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-700">Show X-Axis Category Ticks</label>
+                        <input type="checkbox" id="x-ticks-show" checked onchange="updateChart()" class="rounded text-blue-600">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">X-Tick Direction</label>
+                            <select id="x-tick-direction" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                                <option value="outer" selected>Outer (Standard)</option>
+                                <option value="inner">Inner</option>
+                                <option value="both">Both Sides</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">X-Tick Length (px)</label>
+                            <input type="number" id="x-tick-length" value="4" min="1" max="15" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Legend formatting -->
+                <div id="legend-options-wrapper" class="border-t border-slate-200 pt-4 space-y-3 p-1 rounded">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Legend Options & Spacing</h3>
+                    
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-700">Display Legend</label>
+                        <input type="checkbox" id="legend-show" checked onchange="updateChart()" class="rounded text-blue-600">
+                    </div>
+
+                    <div class="flex items-center justify-between">
+                        <label class="text-xs font-medium text-slate-700">Draw Outer Box</label>
+                        <input type="checkbox" id="legend-box" onchange="updateChart()" class="rounded text-blue-600">
+                    </div>
+
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Legend Title</label>
+                        <div class="rich-toolbar" data-target="legend-title">
+                            <button type="button" class="rich-btn" data-cmd="bold" onmousedown="event.preventDefault(); execRichCmd('legend-title', 'bold')" title="Bold"><b>B</b></button>
+                            <button type="button" class="rich-btn" data-cmd="italic" onmousedown="event.preventDefault(); execRichCmd('legend-title', 'italic')" title="Italic"><i>I</i></button>
+                            <button type="button" class="rich-btn" data-cmd="underline" onmousedown="event.preventDefault(); execRichCmd('legend-title', 'underline')" title="Underline"><u>U</u></button>
+                            <button type="button" class="rich-btn" data-cmd="subscript" onmousedown="event.preventDefault(); execRichCmd('legend-title', 'subscript')" title="Subscript">x<sub>2</sub></button>
+                            <button type="button" class="rich-btn" data-cmd="superscript" onmousedown="event.preventDefault(); execRichCmd('legend-title', 'superscript')" title="Superscript">x<sup>2</sup></button>
+                            <button type="button" class="rich-btn text-[10px]" data-cmd="normal" onmousedown="event.preventDefault(); execRichCmd('legend-title', 'normal')" title="Clear Formatting">T<sub>x</sub></button>
+                            <button type="button" onmousedown="event.preventDefault()" onclick="openSciPicker('legend-title', this)" class="sci-open-btn ml-auto"><span class="font-serif text-xs leading-none">&Omega;</span> Symbols</button>
+                        </div>
+                        <div id="legend-title" data-rich contenteditable="true" spellcheck="false" oninput="updateChart()" class="rich-field"></div>
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Item Gap (px)</label>
+                            <input type="number" id="legend-item-gap" value="5" min="2" max="25" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500">Title Gap (px)</label>
+                            <input type="number" id="legend-title-gap" value="14" min="4" max="30" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+
+                    <button onclick="repositionLegendAuto()" class="w-full text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-1.5 rounded border border-blue-200 flex items-center justify-center gap-1">
+                        <i class="fa-solid fa-arrows-to-dot"></i> Reset Legend to Top-Right
+                    </button>
+                </div>
+
+                <!-- Custom Text Annotations -->
+                <div class="border-t border-slate-200 pt-4 space-y-3">
+                    <div class="flex justify-between items-center">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Custom Text Notes</h3>
+                        <button onclick="addAnnotation()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2 py-1 rounded border border-blue-200 flex items-center gap-1">
+                            <i class="fa-solid fa-plus text-[10px]"></i> Add Text
+                        </button>
+                    </div>
+                    <p class="text-[10px] text-slate-400">Use notes for anything: panel letters, significance letters, p-values, or DNA sequences. Drag a note on the figure to move it.</p>
+                    <div id="annotations-list" class="space-y-3"></div>
+                </div>
+            </div>
+
+            <!-- TAB 4: SAVED STYLE PROFILES -->
+            <div id="tab-profiles" class="p-4 space-y-5 hidden">
+                <div class="space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Save Current Style Configuration</h3>
+                    <div>
+                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Profile Name</label>
+                        <input type="text" id="profile-name-input" placeholder="e.g. Standard Figure" class="w-full text-xs p-1.5 border border-slate-300 rounded mb-2">
+                        <button onclick="saveCurrentStyleProfile()" class="w-full bg-blue-600 hover:bg-blue-500 text-white font-semibold py-1.5 rounded text-xs transition">
+                            <i class="fa-solid fa-floppy-disk mr-1"></i> Save Preset Style
+                        </button>
+                    </div>
+                </div>
+
+                <div class="border-t border-slate-200 pt-4 space-y-3">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Saved Style Profiles</h3>
+                    <div id="profiles-list" class="space-y-2"></div>
+                </div>
+
+                <div class="border-t border-slate-200 pt-4 space-y-2">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Import / Export Profiles</h3>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="exportStyleJSON()" class="bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 text-xs py-1.5 rounded font-medium">
+                            <i class="fa-solid fa-file-export mr-1"></i> Export JSON
+                        </button>
+                        <label class="bg-slate-100 border border-slate-300 text-slate-700 hover:bg-slate-200 text-xs py-1.5 rounded font-medium text-center cursor-pointer">
+                            <i class="fa-solid fa-file-import mr-1"></i> Import JSON
+                            <input type="file" accept=".json" onchange="importStyleJSON(event)" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+        </aside>
+
+        <!-- Right Side Main SVG Preview & Verification Table -->
+        <main class="flex-1 min-w-0 bg-slate-200/60 p-4 overflow-y-auto flex flex-col items-center">
+            
+            <!-- SVG Preview Box -->
+            <div class="bg-white p-4 rounded-lg shadow-sm border border-slate-300 w-full flex-1 min-h-[260px] flex flex-col items-center">
+                <div class="w-full flex flex-wrap justify-between items-center gap-2 mb-3 border-b border-slate-100 pb-2">
+                    <div class="flex items-center gap-2">
+                        <button id="panel-toggle" onclick="togglePanel()" class="zoom-btn" title="Show or hide the settings panel"><i class="fa-solid fa-table-columns"></i></button>
+                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wide">SVG Figure Canvas</span>
+                        <span id="canvas-dim-indicator" class="text-[11px] text-slate-400 font-mono">(90 x 65 mm)</span>
+                    </div>
+                    <div class="flex items-center gap-1">
+                        <button id="zoom-fit-btn" onclick="zoomFit()" class="zoom-btn active" title="Shrink the figure to fit the window">Fit</button>
+                        <button onclick="zoomStep(-1)" class="zoom-btn" title="Zoom out">&minus;</button>
+                        <span id="zoom-label" class="w-14 text-center font-mono text-[11px] text-slate-500">100%</span>
+                        <button onclick="zoomStep(1)" class="zoom-btn" title="Zoom in">+</button>
+                        <button onclick="zoomActual()" class="zoom-btn" title="Actual size (1 canvas mm = screen mm)">100%</button>
+                    </div>
+                    <span class="hidden xl:flex text-[11px] text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200 items-center gap-1">
+                        <i class="fa-solid fa-hand-pointer text-[10px]"></i> Click any chart element to jump to its editor field
+                    </span>
+                </div>
+
+                <div id="canvas-wrapper" class="flex-1 min-h-0 w-full flex bg-slate-300 rounded p-6 overflow-auto">
+                    <div id="canvas-scaler" class="m-auto shrink-0" style="width:580px;height:380px;">
+                        <div id="canvas-zoom-layer" style="width:580px;height:380px;transform-origin:0 0;">
+                            <svg id="chart-svg" width="580" height="380" viewBox="0 0 580 380" xmlns="http://www.w3.org/2000/svg" class="bg-white block">
+                                <!-- Rendered dynamically -->
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Symbols & formatting popup -->
+            <div id="sci-picker" class="hidden" role="dialog" aria-label="Symbols and formatting">
+                <div class="sci-picker-head">
+                    <span>Symbols &amp; formatting</span>
+                    <button type="button" onclick="closeSciPicker()" class="text-slate-400 hover:text-slate-700 text-base leading-none" title="Close (Esc)">&times;</button>
+                </div>
+                <div id="sci-picker-body"></div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Application Script Logic -->
+    <script>
+        let columns = [];   // [{ header, role }]
+        let dataRows = [];  // array of arrays of strings/HTML, one entry per column
+        let lastGroupKey = null;
+        let autoTitles = { x: '', group: '', y: '' };
+        let summaryStats = [];
+        let seriesStyles = {};
+        let isLegendManuallyMoved = false;
+
+        let legendPos = { x: 260, y: 35 };
+        let annotations = [{
+            id: 1, text: '<b>A</b>', x: 22, y: 24, fontSize: 14, color: '#000000', fontFamily: "Arial, Helvetica, sans-serif"
+        }];
+        let axisTitlePos = { x: null, y: null };   // null = automatic position
+        let renderedTitlePos = { x: { x: 0, y: 0 }, y: { x: 0, y: 0 } };
+
+        const MM_TO_PX = 96 / 25.4; // Conversion factor: 1 mm = ~3.78 px at 96 DPI
+
+        const PALETTES = {
+            'colorblind': ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7'],
+            'grayscale': ['#333333', '#888888', '#cccccc', '#000000', '#eeeeee'],
+            'warm': ['#C0392B', '#E67E22', '#F1C40F', '#D35400', '#E74C3C'],
+            'cool': ['#2980B9', '#16A085', '#27AE60', '#8E44AD', '#34495E'],
+            'pastel': ['#779ECB', '#FF6961', '#03C03C', '#F49AC2', '#CB99C9']
+        };
+
+        const SAMPLE_COLS = [
+            { header: 'Experience', role: 'x' },
+            { header: 'Tool', role: 'group' },
+            { header: 'Time to publish (min)', role: 'mean' },
+            { header: 'SEM', role: 'error' }
+        ];
+        const SAMPLE_ROWS = [
+            ['Newbie',  'Others',         '90.0', '6.0'],
+            ['Newbie',  'Easy Bar Chart', '15.0', '1.5'],
+            ['Expert',  'Others',         '30.0', '3.1'],
+            ['Expert',  'Easy Bar Chart', '2.0',  '0.3']
+        ];
+
+        window.onload = function() {
+            initRichFields();
+            setupDataTable();
+            loadSampleData();
+            setupDragAndDrop();
+            setupSciPicker();
+            renderSavedProfilesList();
+            renderAnnotationsList();
+            if (window.ResizeObserver) {
+                new ResizeObserver(() => {
+                    if (zoomMode === 'fit') applyZoom();
+                }).observe(document.getElementById('canvas-wrapper'));
+            }
+        };
+
+        // ---------- rich single-line fields (axis titles, table cells, text notes) ----------
+        function richToValue(el) {
+            const ser = (node) => {
+                let out = '';
+                node.childNodes.forEach(n => {
+                    if (n.nodeType === 3) { out += n.nodeValue.replace(/\u00A0/g, ' '); return; }
+                    if (n.nodeType !== 1) return;
+                    const tag = n.nodeName.toLowerCase();
+                    if (tag === 'br') return;
+                    let inner = ser(n);
+                    if (!inner) return;
+                    const st = n.style || {};
+                    const deco = (st.textDecorationLine || st.textDecoration || '');
+                    if (tag === 'b' || tag === 'strong' || /^(bold|[6-9]00)$/.test(st.fontWeight)) inner = `<b>${inner}</b>`;
+                    if (tag === 'i' || tag === 'em' || st.fontStyle === 'italic') inner = `<i>${inner}</i>`;
+                    if (tag === 'u' || /underline/.test(deco)) inner = `<u>${inner}</u>`;
+                    if (tag === 'sub' || st.verticalAlign === 'sub') inner = `<sub>${inner}</sub>`;
+                    if (tag === 'sup' || st.verticalAlign === 'super') inner = `<sup>${inner}</sup>`;
+                    out += inner;
+                });
+                return out;
+            };
+            return ser(el);
+        }
+
+        function valueToRich(v) {
+            return String(v ?? '').replace(/&/g, '&amp;').replace(/<(?!\/?(?:i|b|u|sub|sup)>)/gi, '&lt;');
+        }
+
+        let lastFocusedField = null;
+
+        function makeRichField(el) {
+            if (el._rich) return;
+            el._rich = true;
+            Object.defineProperty(el, 'value', {
+                configurable: true,
+                get() { return richToValue(el); },
+                set(v) { v = String(v ?? ''); if (richToValue(el) !== v) el.innerHTML = valueToRich(v); }
+            });
+            el.addEventListener('focus', () => { 
+                lastFocusedField = el;
+                try { document.execCommand('styleWithCSS', false, false); } catch (e) {}
+                updateActiveToolbarState();
+            });
+            el.addEventListener('click', () => { lastFocusedField = el; });
+            el.addEventListener('keydown', (e) => {
+                lastFocusedField = el;
+                if (e.key === 'Enter') { e.preventDefault(); return; }
+                if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey) {
+                    if (e.key === ',') { 
+                        e.preventDefault(); 
+                        execRichCmd(el.id, 'subscript');
+                    } else if (e.key === '.') { 
+                        e.preventDefault(); 
+                        execRichCmd(el.id, 'superscript');
+                    }
+                }
+            });
+            el.addEventListener('keyup', () => { lastFocusedField = el; updateActiveToolbarState(); });
+            el.addEventListener('mouseup', () => { lastFocusedField = el; updateActiveToolbarState(); });
+            el.addEventListener('paste', (e) => {
+                e.preventDefault();
+                const t = (e.clipboardData || window.clipboardData).getData('text/plain').replace(/\s*[\r\n]+\s*/g, ' ');
+                if (t) document.execCommand('insertText', false, t);
+                updateChart();
+            });
+            el.addEventListener('drop', (e) => e.preventDefault());
+        }
+
+        function initRichFields() {
+            document.querySelectorAll('[data-rich]').forEach(makeRichField);
+            document.addEventListener('selectionchange', updateActiveToolbarState);
+        }
+
+        const SCI_CMD = { italic: 'italic', bold: 'bold', underline: 'underline', subscript: 'subscript', superscript: 'superscript' };
+
+        function isNodeInside(node, tagName) {
+            let curr = node;
+            while (curr && curr !== document.body) {
+                if (curr.nodeType === 1 && curr.nodeName.toLowerCase() === tagName.toLowerCase()) return true;
+                curr = curr.parentNode;
+            }
+            return false;
+        }
+
+        function execRichCmd(inputId, cmd) {
+            const el = document.getElementById(inputId);
+            if (!el) return;
+            el.focus();
+            lastFocusedField = el;
+
+            if (cmd === 'normal') {
+                document.execCommand('removeFormat', false, null);
+                if (document.queryCommandState('subscript')) document.execCommand('subscript', false, null);
+                if (document.queryCommandState('superscript')) document.execCommand('superscript', false, null);
+            } else if (cmd === 'subscript') {
+                const isSup = document.queryCommandState('superscript');
+                if (isSup) document.execCommand('superscript', false, null);
+                document.execCommand('subscript', false, null);
+            } else if (cmd === 'superscript') {
+                const isSub = document.queryCommandState('subscript');
+                if (isSub) document.execCommand('subscript', false, null);
+                document.execCommand('superscript', false, null);
+            } else {
+                document.execCommand(SCI_CMD[cmd] || cmd, false, null);
+            }
+
+            setTimeout(updateActiveToolbarState, 0);
+            updateChart();
+        }
+
+        function execGlobalRichCmd(cmd) {
+            if (!lastFocusedField || !document.body.contains(lastFocusedField)) {
+                const firstCell = document.querySelector('#data-table-wrap [data-rich]');
+                if (firstCell) lastFocusedField = firstCell;
+            }
+            if (lastFocusedField) {
+                execRichCmd(lastFocusedField.id, cmd);
+            }
+        }
+
+        function openGlobalSciPicker(btn) {
+            if (!lastFocusedField || !document.body.contains(lastFocusedField)) {
+                const firstCell = document.querySelector('#data-table-wrap [data-rich]');
+                if (firstCell) lastFocusedField = firstCell;
+            }
+            if (lastFocusedField) {
+                openSciPicker(lastFocusedField.id, btn);
+            }
+        }
+
+        function insertSciTag(inputId, tag) {
+            execRichCmd(inputId, tag);
+        }
+
+        function insertSciSymbol(inputId, symbol) {
+            const el = document.getElementById(inputId);
+            if (!el) return;
+            el.focus();
+            lastFocusedField = el;
+            document.execCommand('insertText', false, symbol);
+            updateChart();
+        }
+
+        function updateActiveToolbarState() {
+            const activeField = document.activeElement ? document.activeElement.closest('[data-rich]') : lastFocusedField;
+            if (!activeField) return;
+            if (activeField.closest('#tab-data')) lastFocusedField = activeField;
+
+            const sel = window.getSelection();
+            let anchor = sel && sel.rangeCount ? sel.anchorNode : null;
+            if (anchor && anchor.nodeType === 3) anchor = anchor.parentNode;
+
+            const checkCmd = (cmd, tagName) => {
+                let active = false;
+                try { active = document.queryCommandState(cmd); } catch(e) {}
+                if (!active && anchor) active = isNodeInside(anchor, tagName);
+                return active;
+            };
+
+            const states = {
+                bold: checkCmd('bold', 'b') || checkCmd('bold', 'strong'),
+                italic: checkCmd('italic', 'i') || checkCmd('italic', 'em'),
+                underline: checkCmd('underline', 'u'),
+                subscript: checkCmd('subscript', 'sub'),
+                superscript: checkCmd('superscript', 'sup')
+            };
+
+            document.querySelectorAll('.rich-toolbar').forEach(toolbar => {
+                toolbar.querySelectorAll('.rich-btn[data-cmd]').forEach(btn => {
+                    const c = btn.dataset.cmd;
+                    if (c === 'normal') return;
+                    if (states[c]) btn.classList.add('active');
+                    else btn.classList.remove('active');
+                });
+            });
+        }
+
+        function parseHTMLToSVG(htmlStr, baseFontSize, font) {
+            if (!htmlStr) return '';
+            const small = Math.round(baseFontSize * 0.75);
+            const down = Math.round(baseFontSize * 0.25);
+            const up = Math.round(baseFontSize * 0.4);
+
+            return String(htmlStr)
+                .replace(/&/g, '&amp;')
+                .replace(/<(?!\/?(?:i|b|u|sub|sup)>)/gi, '&lt;')
+                .replace(/<i>(.*?)<\/i>/gi, '<tspan font-style="italic">$1</tspan>')
+                .replace(/<b>(.*?)<\/b>/gi, '<tspan font-weight="bold">$1</tspan>')
+                .replace(/<u>(.*?)<\/u>/gi, '<tspan text-decoration="underline">$1</tspan>')
+                .replace(/<sub>(.*?)<\/sub>/gi, `<tspan font-size="${small}" dy="${down}">$1</tspan><tspan dy="-${down}"></tspan>`)
+                .replace(/<sup>(.*?)<\/sup>/gi, `<tspan font-size="${small}" dy="-${up}">$1</tspan><tspan dy="${up}"></tspan>`);
+        }
+
+        // ---------- symbols & formatting popup ----------
+        const SCI_FORMATS = [
+            ['bold', '<b>B</b>', 'Bold (Ctrl/Cmd+B)'],
+            ['italic', '<i>I</i>', 'Italic (Ctrl/Cmd+I)'],
+            ['underline', '<u>U</u>', 'Underline (Ctrl/Cmd+U)'],
+            ['subscript', 'x<sub>2</sub>', 'Subscript (Ctrl/Cmd+,)'],
+            ['superscript', 'x<sup>2</sup>', 'Superscript (Ctrl/Cmd+.)'],
+            ['normal', 'T<sub>x</sub>', 'Clear Formatting']
+        ];
+        const SCI_GROUPS = [
+            { name: 'Greek lowercase', items: [['\u03B1','alpha'],['\u03B2','beta'],['\u03B3','gamma'],['\u03B4','delta'],['\u03B5','epsilon'],['\u03B6','zeta'],['\u03B7','eta'],['\u03B8','theta'],['\u03B9','iota'],['\u03BA','kappa'],['\u03BB','lambda'],['\u03BC','mu (Greek)'],['\u03BD','nu'],['\u03BE','xi'],['\u03C0','pi'],['\u03C1','rho'],['\u03C3','sigma'],['\u03C2','final sigma'],['\u03C4','tau'],['\u03C5','upsilon'],['\u03C6','phi'],['\u03C7','chi'],['\u03C8','psi'],['\u03C9','omega']] },
+            { name: 'Greek uppercase', items: [['\u0393','Gamma'],['\u0394','Delta'],['\u0398','Theta'],['\u039B','Lambda'],['\u039E','Xi'],['\u03A0','Pi'],['\u03A3','Sigma'],['\u03A6','Phi'],['\u03A8','Psi'],['\u03A9','Omega / ohm']] },
+            { name: 'Math & statistics', items: [['\u00B1','plus-minus'],['\u2213','minus-plus'],['\u00D7','times'],['\u00F7','divide'],['\u2212','minus sign'],['\u00B7','middle dot'],['\u2264','less than or equal'],['\u2265','greater than or equal'],['\u2260','not equal'],['\u2248','approximately'],['\u2245','congruent'],['\u223C','similar / tilde'],['\u221D','proportional to'],['\u221E','infinity'],['\u221A','square root'],['\u2211','sum'],['\u220F','product'],['\u222B','integral'],['\u2202','partial'],['\u2207','nabla'],['%','percent'],['\u2030','per mille'],['\u00B0','degree'],['\u2032','prime'],['\u2033','double prime'],['\u00BD','one half'],['\u00BC','one quarter'],['\u00BE','three quarters'],['x\u0304','x-bar (sample mean)']] },
+            { name: 'Units', items: [['\u00B5','micro sign'],['\u00C5','angstrom'],['\u00B0C','degrees Celsius'],['\u00B0F','degrees Fahrenheit'],['\u00B5m','micrometre'],['\u00B5M','micromolar'],['\u00B5L','microlitre'],['\u00B5g','microgram'],['\u00B5mol','micromole'],['mM','millimolar'],['m\u207B\u00B2','per square metre'],['s\u207B\u00B9','per second'],['L\u207B\u00B9','per litre'],['g\u207B\u00B9','per gram']] },
+            { name: 'Superscript & subscript characters', items: ['\u2070','\u00B9','\u00B2','\u00B3','\u2074','\u2075','\u2076','\u2077','\u2078','\u2079','\u207A','\u207B','\u2080','\u2081','\u2082','\u2083','\u2084','\u2085','\u2086','\u2087','\u2088','\u2089','\u208A','\u208B'].map((c, i) => [c, (i < 12 ? 'superscript ' : 'subscript ') + ['0','1','2','3','4','5','6','7','8','9','plus','minus'][i % 12]]) },
+            { name: 'Significance & footnote markers', items: [['*','asterisk'],['\u2020','dagger'],['\u2021','double dagger'],['\u00A7','section'],['\u00B6','pilcrow'],['\u2016','double bar'],['#','hash'],['\u2022','bullet'],['\u25E6','white bullet'],['\u25B2','triangle up'],['\u25BC','triangle down'],['\u25CF','filled circle'],['\u25CB','open circle'],['\u25A0','filled square'],['\u25A1','open square'],['\u25C6','filled diamond'],['\u25C7','open diamond'],['\u2605','filled star'],['\u2606','open star']] },
+            { name: 'Arrows', items: [['\u2190','left'],['\u2192','right'],['\u2191','up'],['\u2193','down'],['\u2194','left-right'],['\u21D2','implies'],['\u21D4','if and only if'],['\u2197','up-right'],['\u2198','down-right']] },
+            { name: 'Punctuation', items: [['\u2013','en dash (ranges)'],['\u2014','em dash'],['\u2026','ellipsis'],['\u2018','left single quote'],['\u2019','right single quote'],['\u201C','left double quote'],['\u201D','right double quote']] }
+        ];
+        let sciTargetId = null;
+
+        function buildSciPicker() {
+            let html = `<div><div class="sci-group-title" style="margin-top:2px">Formatting</div><div class="sci-row">`
+                + SCI_FORMATS.map(([tag, label, title]) => `<button type="button" class="sci-cell" data-tag="${tag}" title="${title}">${label}</button>`).join('')
+                + '</div></div>';
+            SCI_GROUPS.forEach(g => {
+                html += `<div><div class="sci-group-title">${g.name}</div><div class="sci-row">`
+                    + g.items.map(([c, n]) => `<button type="button" class="sci-cell" data-sym="${esc(c)}" title="${esc(n)}">${esc(c)}</button>`).join('')
+                    + '</div></div>';
+            });
+            document.getElementById('sci-picker-body').innerHTML = html;
+        }
+
+        function setupSciPicker() {
+            buildSciPicker();
+            const pop = document.getElementById('sci-picker');
+            pop.addEventListener('mousedown', (e) => { if (!e.target.closest('#sci-picker-body') || e.target.closest('.sci-cell')) e.preventDefault(); });
+            pop.addEventListener('click', (e) => {
+                const cell = e.target.closest('.sci-cell');
+                if (!cell) return;
+                if (!sciTargetId || !document.getElementById(sciTargetId)) { closeSciPicker(); return; }
+                if (cell.dataset.tag) insertSciTag(sciTargetId, cell.dataset.tag);
+                else insertSciSymbol(sciTargetId, cell.dataset.sym);
+            });
+            document.addEventListener('mousedown', (e) => {
+                if (!pop.classList.contains('hidden') && !pop.contains(e.target) && !e.target.closest('.sci-open-btn')) closeSciPicker();
+            });
+            document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeSciPicker(); });
+            document.addEventListener('selectionchange', updateSciFormatState);
+            window.addEventListener('resize', closeSciPicker);
+            document.getElementById('side-panel').addEventListener('scroll', closeSciPicker);
+        }
+
+        function openSciPicker(inputId, btn) {
+            const pop = document.getElementById('sci-picker');
+            if (!pop.classList.contains('hidden') && sciTargetId === inputId) { closeSciPicker(); return; }
+            sciTargetId = inputId;
+            pop.classList.remove('hidden');
+            const field = document.getElementById(inputId) || btn;
+            if (field.isContentEditable) {
+                field.focus();
+                lastFocusedField = field;
+                const sel = window.getSelection();
+                if (!sel.rangeCount || !field.contains(sel.anchorNode)) {
+                    const r = document.createRange();
+                    r.selectNodeContents(field); r.collapse(false);
+                    sel.removeAllRanges(); sel.addRange(r);
+                }
+            }
+            positionSciPicker(field);
+            updateSciFormatState();
+        }
+
+        function positionSciPicker(field) {
+            const pop = document.getElementById('sci-picker');
+            const f = field.getBoundingClientRect();
+            const gap = 6, pad = 8, vh = window.innerHeight, vw = window.innerWidth;
+            const below = vh - f.bottom - gap - pad;
+            const above = f.top - gap - pad;
+            const placeBelow = below >= 260 || below >= above;
+            const maxH = Math.min(480, placeBelow ? below : above);
+
+            if (maxH < 150) {
+                pop.style.maxHeight = Math.min(480, vh - 2 * pad) + 'px';
+                const panel = document.getElementById('side-panel').getBoundingClientRect();
+                pop.style.left = Math.max(pad, Math.min(panel.right + pad, vw - pop.offsetWidth - pad)) + 'px';
+                pop.style.top = Math.max(pad, Math.min(f.top, vh - pop.offsetHeight - pad)) + 'px';
+                return;
+            }
+            pop.style.maxHeight = maxH + 'px';
+            const ph = pop.offsetHeight, pw = pop.offsetWidth;
+            pop.style.left = Math.max(pad, Math.min(f.left, vw - pw - pad)) + 'px';
+            pop.style.top = (placeBelow ? f.bottom + gap : f.top - gap - ph) + 'px';
+        }
+
+        function updateSciFormatState() {
+            const pop = document.getElementById('sci-picker');
+            if (pop.classList.contains('hidden')) return;
+            const sel = window.getSelection();
+            const anchor = (sel && sel.rangeCount) ? sel.anchorNode : null;
+
+            pop.querySelectorAll('[data-tag]').forEach(b => {
+                let on = false;
+                const tag = b.dataset.tag;
+                if (tag === 'normal') return;
+                try { on = document.queryCommandState(SCI_CMD[tag] || tag); } catch (e) {}
+                if (!on && anchor) {
+                    if (tag === 'subscript') on = isNodeInside(anchor, 'sub');
+                    else if (tag === 'superscript') on = isNodeInside(anchor, 'sup');
+                    else if (tag === 'bold') on = isNodeInside(anchor, 'b') || isNodeInside(anchor, 'strong');
+                    else if (tag === 'italic') on = isNodeInside(anchor, 'i') || isNodeInside(anchor, 'em');
+                    else if (tag === 'underline') on = isNodeInside(anchor, 'u');
+                }
+                b.classList.toggle('active', !!on);
+            });
+        }
+
+        function closeSciPicker() {
+            document.getElementById('sci-picker').classList.add('hidden');
+            sciTargetId = null;
+        }
+
+        // ---------- zoom and panel ----------
+        const ZOOM_STEPS = [0.25, 0.33, 0.5, 0.67, 0.75, 1, 1.25, 1.5, 2, 3, 4];
+        let zoomMode = 'fit';
+        let zoomManual = 1;
+        let currentScale = 1;
+        let canvasW = 580, canvasH = 380;
+
+        function computeFitScale(W, H) {
+            const wrap = document.getElementById('canvas-wrapper');
+            const cw = wrap.clientWidth - 32;
+            const ch = wrap.clientHeight - 32;
+            if (cw <= 0 || ch <= 0) return 1;
+            return Math.max(0.1, Math.min(2.5, cw / W, ch / H));
+        }
+
+        function applyZoom(W = canvasW, H = canvasH) {
+            canvasW = W; canvasH = H;
+            currentScale = zoomMode === 'fit' ? computeFitScale(W, H) : zoomManual;
+            const scaler = document.getElementById('canvas-scaler');
+            const layer = document.getElementById('canvas-zoom-layer');
+            scaler.style.width = Math.floor(W * currentScale) + 'px';
+            scaler.style.height = Math.floor(H * currentScale) + 'px';
+            layer.style.width = W + 'px';
+            layer.style.height = H + 'px';
+            layer.style.transform = `scale(${currentScale})`;
+            document.getElementById('zoom-label').textContent = Math.round(currentScale * 100) + '%';
+            document.getElementById('zoom-fit-btn').classList.toggle('active', zoomMode === 'fit');
+        }
+
+        function zoomFit() { zoomMode = 'fit'; applyZoom(); }
+        function zoomActual() { zoomMode = 'manual'; zoomManual = 1; applyZoom(); }
+        function zoomStep(dir) {
+            const cur = currentScale;
+            let next;
+            if (dir > 0) next = ZOOM_STEPS.find(z => z > cur + 0.005) || ZOOM_STEPS[ZOOM_STEPS.length - 1];
+            else next = [...ZOOM_STEPS].reverse().find(z => z < cur - 0.005) || ZOOM_STEPS[0];
+            zoomMode = 'manual'; zoomManual = next;
+            applyZoom();
+        }
+
+        function togglePanel() {
+            document.getElementById('side-panel').classList.toggle('hidden');
+            closeSciPicker();
+            setTimeout(() => { if (zoomMode === 'fit') applyZoom(); }, 50);
+        }
+
+        function switchTab(tab) {
+            ['data', 'style', 'annotations', 'profiles'].forEach(t => {
+                document.getElementById(`tab-${t}`).classList.add('hidden');
+                const btn = document.getElementById(`tab-btn-${t}`);
+                btn.classList.remove('text-blue-600', 'border-blue-600');
+                btn.classList.add('text-slate-500', 'border-transparent');
+            });
+
+            document.getElementById(`tab-${tab}`).classList.remove('hidden');
+            const activeBtn = document.getElementById(`tab-btn-${tab}`);
+            activeBtn.classList.remove('text-slate-500', 'border-transparent');
+            activeBtn.classList.add('text-blue-600', 'border-blue-600');
+        }
+
+        function navigateAndHighlight(tabName, targetId) {
+            switchTab(tabName);
+            setTimeout(() => {
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    targetEl.classList.remove('field-highlight');
+                    void targetEl.offsetWidth;
+                    targetEl.classList.add('field-highlight');
+                    const inputField = targetEl.querySelector('input, select, textarea, [contenteditable="true"]') || targetEl;
+                    if (inputField && typeof inputField.focus === 'function') {
+                        inputField.focus();
+                    }
+                }
+            }, 60);
+        }
+
+        function loadSampleData() {
+            columns = SAMPLE_COLS.map(c => ({ ...c }));
+            dataRows = SAMPLE_ROWS.map(r => r.slice());
+            isLegendManuallyMoved = false;
+            lastGroupKey = null;
+            renderDataTable();
+            applyTable(true);
+        }
+
+        function clearData() {
+            dataRows = [];
+            lastGroupKey = null;
+            renderDataTable();
+            applyTable();
+        }
+
+        const esc = (v) => String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        const toNum = (v) => { v = String(v).trim(); return v === '' ? NaN : Number(v); };
+        const blankRow = () => columns.map(() => '');
+        const rowIsBlank = (r) => r.every(c => !String(c).trim());
+        const ROLES = [
+            ['x', 'Category'], 
+            ['group', 'Subgroup'], 
+            ['mean', 'Mean'], 
+            ['error', '± Error'], 
+            ['plus', '+ Error'], 
+            ['minus', '− Error'], 
+            ['ignore', 'Ignore']
+        ];
+        const NUMERIC_ROLES = ['mean', 'error', 'plus', 'minus'];
+
+        function splitLine(line, delim) {
+            if (delim === '\t') return line.split('\t').map(c => c.trim());
+            const out = []; let cur = '', q = false;
+            for (const ch of line) {
+                if (ch === '"') q = !q;
+                else if (ch === ',' && !q) { out.push(cur.trim()); cur = ''; }
+                else cur += ch;
+            }
+            out.push(cur.trim());
+            return out;
+        }
+
+        // ---------- table rendering (compact width) ----------
+        function headCellHtml(c, j) {
+            const opts = ROLES.map(([v, l]) => `<option value="${v}"${c.role === v ? ' selected' : ''}>${l}</option>`).join('');
+            const roleCls = c.role === 'ignore' ? 'text-slate-400' : 'text-blue-700 font-semibold';
+            return `<th class="border border-slate-200 bg-slate-100 p-0.5 align-top" style="width: 25%">
+                <div class="flex items-center justify-between mb-0.5 px-0.5">
+                    <span class="text-[9px] text-slate-400 font-mono">Col ${j+1}</span>
+                    <button type="button" onclick="deleteColumn(${j})" class="text-slate-400 hover:text-red-600 text-xs leading-none px-0.5" title="Delete column">&times;</button>
+                </div>
+                <div id="hdr-input-${j}" data-rich contenteditable="true" spellcheck="false" data-row="h" data-col="${j}" class="rich-field text-xs font-bold text-slate-700 mb-0.5"></div>
+                <select data-role-col="${j}" class="w-full text-[10px] border border-slate-200 bg-white py-0 px-0.5 rounded focus:outline-none ${roleCls}">${opts}</select>
+            </th>`;
+        }
+
+        function rowHtml(i) {
+            const r = dataRows[i];
+            const cells = columns.map((c, j) => {
+                const num = NUMERIC_ROLES.includes(c.role) ? 'font-mono text-right' : '';
+                return `<td class="border border-slate-200 p-0.5 align-top">
+                    <div id="cell-input-${i}-${j}" data-rich contenteditable="true" spellcheck="false" data-row="${i}" data-col="${j}" class="rich-field text-xs ${num}"></div>
+                </td>`;
+            }).join('');
+            return `<tr>${cells}<td class="border border-slate-200 text-center align-middle" style="width:20px"><button type="button" onclick="deleteRow(${i})" class="text-slate-400 hover:text-red-600 text-xs leading-none px-0.5" title="Delete row">&times;</button></td></tr>`;
+        }
+
+        function renderDataTable() {
+            if (!dataRows.length || !rowIsBlank(dataRows[dataRows.length - 1])) dataRows.push(blankRow());
+            document.getElementById('data-table-head').innerHTML = '<tr>' + columns.map(headCellHtml).join('') + '<th class="border border-slate-200 bg-slate-100" style="width:20px"></th></tr>';
+            document.getElementById('data-table-body').innerHTML = dataRows.map((_, i) => rowHtml(i)).join('');
+            
+            columns.forEach((c, j) => {
+                const el = document.getElementById(`hdr-input-${j}`);
+                if (el) {
+                    makeRichField(el);
+                    el.value = c.header;
+                    el.oninput = () => {
+                        columns[j].header = el.value;
+                        applyTable();
+                    };
+                }
+            });
+
+            dataRows.forEach((r, i) => {
+                columns.forEach((_, j) => {
+                    const el = document.getElementById(`cell-input-${i}-${j}`);
+                    if (el) {
+                        makeRichField(el);
+                        el.value = r[j] ?? '';
+                        el.oninput = () => {
+                            dataRows[i][j] = el.value;
+                            if (i === dataRows.length - 1 && el.value.trim()) addRow();
+                            applyTable();
+                        };
+                    }
+                });
+            });
+        }
+
+        function addRow(focus = false) {
+            dataRows.push(blankRow());
+            renderDataTable();
+            if (focus) {
+                const el = document.getElementById(`cell-input-${dataRows.length - 1}-0`);
+                if (el) el.focus();
+            }
+        }
+
+        function deleteRow(i) {
+            dataRows.splice(i, 1);
+            renderDataTable();
+            applyTable();
+        }
+
+        function addColumn() {
+            columns.push({ header: '', role: 'ignore' });
+            dataRows.forEach(r => r.push(''));
+            renderDataTable();
+            applyTable();
+        }
+
+        function deleteColumn(j) {
+            if (columns.length <= 1) return;
+            columns.splice(j, 1);
+            dataRows.forEach(r => r.splice(j, 1));
+            renderDataTable();
+            applyTable();
+        }
+
+        function setRole(j, role) {
+            if (role !== 'ignore') columns.forEach((c, k) => { if (k !== j && c.role === role) c.role = 'ignore'; });
+            columns[j].role = role;
+            renderDataTable();
+            applyTable();
+        }
+
+        // ---------- paste handling ----------
+        function looksLikeHeader(grid) {
+            const first = grid[0].map(c => String(c).trim()).filter(Boolean);
+            if (!first.length || first.some(c => !isNaN(Number(c)))) return false;
+            return grid.length === 1 || grid.slice(1).some(r => r.some(c => String(c).trim() && !isNaN(Number(c))));
+        }
+
+        function guessRoles(headers, grid) {
+            const n = headers.length;
+            const roles = Array(n).fill('ignore');
+            const used = {};
+            const assign = (j, r) => { if (!used[r] && roles[j] === 'ignore') { roles[j] = r; used[r] = true; } };
+            const isNumCol = (j) => {
+                const v = grid.map(r => String(r[j] ?? '').replace(/<[^>]+>/g, '').trim()).filter(Boolean);
+                return v.length > 0 && v.every(x => !isNaN(Number(x)));
+            };
+            const numeric = headers.map((_, j) => isNumCol(j));
+
+            headers.forEach((h, j) => {
+                const t = String(h).replace(/<[^>]+>/g, '').toLowerCase();
+                if (numeric[j]) {
+                    if (/mean|average|avg|time/.test(t)) assign(j, 'mean');
+                    else if (/\b(sem|sd|se|ci|error|err|stdev|stderr)\b/.test(t))
+                        assign(j, 'error');
+                } else {
+                    const isGroup = /subgroup|group|treat|condition|series|legend|tool/.test(t);
+                    const isCat = /categor|genotype|line|strain|sample|species|cultivar|variety|medium|media|experience/.test(t);
+                    if (isGroup) assign(j, 'group'); else if (isCat) assign(j, 'x');
+                }
+            });
+
+            if (!used.mean) {
+                const order = ['mean', 'error'].filter(r => !used[r]);
+                headers.forEach((_, j) => { if (numeric[j] && roles[j] === 'ignore' && order.length) assign(j, order.shift()); });
+            }
+
+            headers.forEach((_, j) => {
+                if (numeric[j] || roles[j] !== 'ignore') return;
+                if (!used.x) assign(j, 'x'); else if (!used.group) assign(j, 'group');
+            });
+
+            if (!used.x) { const j = roles.indexOf('ignore'); if (j >= 0) assign(j, 'x'); }
+            return roles;
+        }
+
+        function loadGrid(grid) {
+            const nCols = Math.max(...grid.map(r => r.length));
+            grid = grid.map(r => { const c = r.slice(); while (c.length < nCols) c.push(''); return c; });
+            const headers = looksLikeHeader(grid) ? grid.shift() : Array(nCols).fill('');
+            const roles = guessRoles(headers, grid);
+            columns = headers.map((h, j) => ({ header: h, role: roles[j] }));
+            dataRows = grid;
+            lastGroupKey = null;
+            isLegendManuallyMoved = false;
+            renderDataTable();
+            applyTable(true);
+        }
+
+        function fillGrid(grid, r0, c0) {
+            const need = c0 + Math.max(...grid.map(r => r.length));
+            while (columns.length < need) { columns.push({ header: '', role: 'ignore' }); dataRows.forEach(r => r.push('')); }
+            grid.forEach((cells, k) => {
+                while (dataRows.length <= r0 + k) dataRows.push(blankRow());
+                cells.forEach((c, m) => { dataRows[r0 + k][c0 + m] = c; });
+            });
+            renderDataTable();
+            applyTable();
+        }
+
+        function setupDataTable() {
+            const wrap = document.getElementById('data-table-wrap');
+
+            wrap.addEventListener('change', (e) => {
+                if (e.target.dataset.roleCol !== undefined) setRole(parseInt(e.target.dataset.roleCol), e.target.value);
+            });
+
+            wrap.addEventListener('keydown', (e) => {
+                const t = e.target;
+                if (e.key !== 'Enter' || t.dataset.col === undefined) return;
+                e.preventDefault();
+                let r = t.dataset.row === 'h' ? -1 : parseInt(t.dataset.row);
+                r += e.shiftKey ? -1 : 1;
+                const sel = r < 0 ? `#hdr-input-${t.dataset.col}` : `#cell-input-${r}-${t.dataset.col}`;
+                const next = wrap.querySelector(sel);
+                if (next) next.focus();
+            });
+
+            wrap.addEventListener('paste', (e) => {
+                const t = e.target;
+                if (t.dataset.col === undefined) return;
+                const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\r/g, '');
+                if (!/[\t\n]/.test(text.trim())) return;
+
+                e.preventDefault();
+                const delim = text.includes('\t') ? '\t' : ',';
+                const grid = text.split('\n').filter(l => l.trim()).map(l => splitLine(l, delim).map(c => c.replace(/^"|"$/g, '')));
+                if (!grid.length) return;
+
+                const inHeader = t.dataset.row === 'h';
+                const r0 = inHeader ? 0 : parseInt(t.dataset.row);
+                const c0 = parseInt(t.dataset.col);
+                if (inHeader || (r0 === 0 && c0 === 0)) loadGrid(grid);
+                else fillGrid(grid, r0, c0);
+            });
+        }
+
+        function syncTitles(force) {
+            const hdr = (role) => { const c = columns.find(c => c.role === role); return c ? c.header.replace(/<[^>]+>/g, '').trim() : ''; };
+            const next = { x: hdr('x'), group: hdr('group'), y: hdr('mean') };
+            [['x', 'x-title'], ['y', 'y-title']].forEach(([k, id]) => {
+                const el = document.getElementById(id);
+                if (force || el.value === autoTitles[k]) el.value = next[k];
+                autoTitles[k] = next[k];
+            });
+        }
+
+        function applyTable(forceTitles = false) {
+            const col = (role) => columns.findIndex(c => c.role === role);
+            const ix = col('x'), ig = col('group'), im = col('mean'), ie = col('error'), ip = col('plus'), imn = col('minus');
+            const seen = new Map();
+            const warnings = [];
+            const status = document.getElementById('data-status');
+
+            if (ix < 0 || im < 0) {
+                summaryStats = [];
+                status.textContent = 'Choose a Category column and a Mean column using the dropdowns under the headers.';
+                status.className = 'text-[11px] text-amber-600';
+            } else {
+                dataRows.forEach((r, i) => {
+                    if (rowIsBlank(r)) return;
+                    const xRaw = String(r[ix] ?? '').trim();
+                    const xClean = xRaw.replace(/<[^>]+>/g, '').trim();
+                    const mean = toNum(String(r[im] ?? '').replace(/<[^>]+>/g, ''));
+                    if (!xClean || isNaN(mean)) { warnings.push(`row ${i + 1} needs a category and a numeric mean`); return; }
+
+                    let plus = 0, minus = 0;
+                    if (ie >= 0) {
+                        const raw = String(r[ie] ?? '').replace(/<[^>]+>/g, '').trim(), eVal = toNum(raw);
+                        if (raw && isNaN(eVal)) warnings.push(`row ${i + 1} error isn't a number`);
+                        plus = isNaN(eVal) ? 0 : Math.abs(eVal);
+                        minus = plus;
+                    }
+                    if (ip >= 0) {
+                        const raw = String(r[ip] ?? '').replace(/<[^>]+>/g, '').trim(), p = toNum(raw);
+                        if (raw && isNaN(p)) warnings.push(`row ${i + 1} +error isn't a number`);
+                        plus = isNaN(p) ? 0 : Math.abs(p);
+                    }
+                    if (imn >= 0) {
+                        const raw = String(r[imn] ?? '').replace(/<[^>]+>/g, '').trim(), m = toNum(raw);
+                        if (raw && isNaN(m)) warnings.push(`row ${i + 1} \u2212error isn't a number`);
+                        minus = isNaN(m) ? 0 : Math.abs(m);
+                    }
+
+                    const groupRaw = ig >= 0 ? String(r[ig] ?? '').trim() : '';
+                    const groupClean = groupRaw.replace(/<[^>]+>/g, '').trim() || 'Default';
+                    const groupKey = groupRaw || 'Default';
+                    const key = xClean + '|||' + groupClean;
+                    if (seen.has(key)) warnings.push(`row ${i + 1} repeats ${xClean} / ${groupClean}, last one used`);
+                    seen.set(key, { x: xRaw, group: groupKey, mean, errPlus: plus, errMinus: minus });
+                });
+                summaryStats = Array.from(seen.values());
+                status.textContent = (summaryStats.length ? `${summaryStats.length} bars plotted. ` : 'No valid rows yet. ') + warnings.join('; ') + (warnings.length ? '.' : '');
+                status.className = 'text-[11px] ' + (warnings.length ? 'text-amber-600' : 'text-slate-500');
+            }
+
+            syncTitles(forceTitles);
+            ensureSeriesStyles();
+            const groupKey = Array.from(new Set(summaryStats.map(s => s.group))).join('|||');
+            if (groupKey !== lastGroupKey) {
+                lastGroupKey = groupKey;
+                renderSeriesCustomizer();
+            }
+            updateChart();
+        }
+
+        function ensureSeriesStyles() {
+            const colors = PALETTES[document.getElementById('color-palette').value] || PALETTES['colorblind'];
+            Array.from(new Set(summaryStats.map(s => s.group))).forEach((g, idx) => {
+                if (!seriesStyles[g]) seriesStyles[g] = { color: colors[idx % colors.length], pattern: 'none' };
+            });
+        }
+
+        function calculateNiceTicks(min, max, maxTicks = 5) {
+            if (min === max) return { ticks: [min, max], min, max, step: 1 };
+            const range = max - min;
+            const rawStep = range / (maxTicks - 1);
+            const mag = Math.pow(10, Math.floor(Math.log10(rawStep)));
+            const residual = rawStep / mag;
+
+            let niceStep = mag;
+            if (residual > 1.5) niceStep = 2 * mag;
+            if (residual > 3) niceStep = 5 * mag;
+            if (residual > 7) niceStep = 10 * mag;
+
+            const niceMin = Math.floor(min / niceStep) * niceStep;
+            const niceMax = Math.ceil(max / niceStep) * niceStep;
+
+            const ticks = [];
+            for (let t = niceMin; t <= niceMax + (niceStep * 0.00001); t += niceStep) {
+                ticks.push(parseFloat(t.toFixed(4)));
+            }
+
+            return { ticks, min: niceMin, max: niceMax, step: niceStep };
+        }
+
+        function applyColorPalette() {
+            const paletteKey = document.getElementById('color-palette').value;
+            const colors = PALETTES[paletteKey] || PALETTES['colorblind'];
+
+            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+            subGroups.forEach((g, idx) => {
+                if (!seriesStyles[g]) seriesStyles[g] = {};
+                seriesStyles[g].color = colors[idx % colors.length];
+                if (!seriesStyles[g].pattern) seriesStyles[g].pattern = 'none';
+            });
+
+            renderSeriesCustomizer();
+            updateChart();
+        }
+
+        function renderSeriesCustomizer() {
+            const container = document.getElementById('series-customizer');
+            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+            container.innerHTML = '';
+
+            subGroups.forEach((g, idx) => {
+                if (!seriesStyles[g]) {
+                    const paletteKey = document.getElementById('color-palette').value;
+                    const colors = PALETTES[paletteKey] || PALETTES['colorblind'];
+                    seriesStyles[g] = { color: colors[idx % colors.length], pattern: 'none' };
+                }
+
+                const groupLabelClean = g === 'Default' ? 'Primary' : parseHTMLToSVG(g, 12, 'sans-serif').replace(/<[^>]+>/g, '');
+                container.innerHTML += `
+                    <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+                        <div class="text-xs font-bold text-slate-700 flex justify-between items-center">
+                            <span>Group: ${groupLabelClean}</span>
+                        </div>
+                        <div class="grid grid-cols-2 gap-2">
+                            <div>
+                                <label class="block text-[10px] text-slate-500">Fill Color</label>
+                                <input type="color" value="${seriesStyles[g].color}" oninput="seriesStyles['${esc(g)}'].color = this.value; updateChart();" class="w-full h-7 p-0 border border-slate-300 rounded cursor-pointer">
+                            </div>
+                            <div>
+                                <label class="block text-[10px] text-slate-500">Hatching</label>
+                                <select onchange="seriesStyles['${esc(g)}'].pattern = this.value; updateChart();" class="w-full text-xs p-1 border border-slate-300 rounded">
+                                    <option value="none" ${seriesStyles[g].pattern === 'none' ? 'selected' : ''}>Solid Fill</option>
+                                    <option value="diag-right" ${seriesStyles[g].pattern === 'diag-right' ? 'selected' : ''}>Diagonal Right</option>
+                                    <option value="diag-left" ${seriesStyles[g].pattern === 'diag-left' ? 'selected' : ''}>Diagonal Left</option>
+                                    <option value="crosshatch" ${seriesStyles[g].pattern === 'crosshatch' ? 'selected' : ''}>Crosshatch</option>
+                                    <option value="dots" ${seriesStyles[g].pattern === 'dots' ? 'selected' : ''}>Dots</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function repositionLegendAuto() {
+            isLegendManuallyMoved = false;
+            updateChart();
+        }
+
+        function updateChart() {
+            ensureSeriesStyles();
+
+            const svg = document.getElementById('chart-svg');
+            const widthMm = parseFloat(document.getElementById('svg-width-mm').value) || 90;
+            const heightMm = parseFloat(document.getElementById('svg-height-mm').value) || 65;
+
+            const svgWidth = Math.round(widthMm * MM_TO_PX);
+            const svgHeight = Math.round(heightMm * MM_TO_PX);
+
+            document.getElementById('canvas-dim-indicator').innerText = `(${widthMm} x ${heightMm} mm)`;
+
+            svg.setAttribute('width', svgWidth);
+            svg.setAttribute('height', svgHeight);
+            svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+            applyZoom(svgWidth, svgHeight);
+
+            let margin = {
+                top: Math.round((parseFloat(document.getElementById('margin-top-mm').value) || 10) * MM_TO_PX),
+                bottom: Math.round((parseFloat(document.getElementById('margin-bottom-mm').value) || 14) * MM_TO_PX),
+                left: Math.round((parseFloat(document.getElementById('margin-left-mm').value) || 15) * MM_TO_PX),
+                right: Math.round((parseFloat(document.getElementById('margin-right-mm').value) || 6) * MM_TO_PX)
+            };
+
+            const plotWidth = Math.max(50, svgWidth - margin.left - margin.right);
+            const plotHeight = Math.max(50, svgHeight - margin.top - margin.bottom);
+
+            const font = document.getElementById('font-family').value;
+            const baseFontSize = parseInt(document.getElementById('font-size').value) || 11;
+            const capWidth = parseInt(document.getElementById('cap-width').value) || 8;
+            
+            const strokeWidth = parseFloat(document.getElementById('universal-stroke-width').value) || 1.2;
+            const barStrokeColor = '#000000';
+            const groupPadding = parseFloat(document.getElementById('group-padding').value) || 0.25;
+            const innerGap = parseInt(document.getElementById('bar-gap').value) || 2;
+
+            const legendItemGap = parseInt(document.getElementById('legend-item-gap').value) || 5;
+            const legendTitleGap = parseInt(document.getElementById('legend-title-gap').value) || 14;
+
+            const yTitleRaw = document.getElementById('y-title').value;
+            const xTitleRaw = document.getElementById('x-title').value;
+
+            const showLegend = document.getElementById('legend-show').checked;
+            const showLegendBox = document.getElementById('legend-box').checked;
+            const legendTitle = document.getElementById('legend-title').value;
+
+            const xCategories = Array.from(new Set(summaryStats.map(s => s.x)));
+            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+
+            let rawMaxVal = 0;
+            summaryStats.forEach(s => {
+                const err = s.errPlus;
+                if (s.mean + err > rawMaxVal) rawMaxVal = s.mean + err;
+            });
+
+            const userYMinInput = document.getElementById('y-min');
+            const userYMaxInput = document.getElementById('y-max');
+            const userYStepInput = document.getElementById('y-step');
+
+            const userYMin = parseFloat(userYMinInput.value);
+            const userYMax = parseFloat(userYMaxInput.value);
+            const userYStep = parseFloat(userYStepInput.value);
+
+            let calculatedMin = 0;
+            let calculatedMax = rawMaxVal === 0 ? 10 : rawMaxVal * 1.015;
+
+            const niceAuto = calculateNiceTicks(calculatedMin, calculatedMax, 5);
+            calculatedMin = niceAuto.min;
+            calculatedMax = niceAuto.max;
+
+            const yMin = !isNaN(userYMin) ? userYMin : calculatedMin;
+            const yMax = !isNaN(userYMax) ? userYMax : calculatedMax;
+
+            // Populate actual values into placeholders and set input values if currently empty/blank so spinners work properly from auto state
+            userYMinInput.placeholder = `${calculatedMin}`;
+            userYMaxInput.placeholder = `${calculatedMax}`;
+            if (userYMinInput.value === '') userYMinInput.value = calculatedMin;
+            if (userYMaxInput.value === '') userYMaxInput.value = calculatedMax;
+
+            let ticks = [];
+            let effectiveStep = niceAuto.step;
+
+            if (!isNaN(userYStep) && userYStep > 0) {
+                effectiveStep = userYStep;
+                for (let t = yMin; t <= yMax + 0.0001; t += userYStep) {
+                    ticks.push(parseFloat(t.toFixed(4)));
+                }
+            } else {
+                const customNice = calculateNiceTicks(yMin, yMax, 5);
+                ticks = customNice.ticks;
+                effectiveStep = customNice.step;
+            }
+
+            userYStepInput.placeholder = `${effectiveStep}`;
+            if (userYStepInput.value === '') userYStepInput.value = effectiveStep;
+
+            const showYTicks = document.getElementById('y-ticks-show').checked;
+            const yTickDir = document.getElementById('tick-direction').value;
+            const yMajorTickLen = parseFloat(document.getElementById('tick-length').value) || 4;
+            
+            const showXTicks = document.getElementById('x-ticks-show').checked;
+            const xTickDir = document.getElementById('x-tick-direction').value;
+            const xMajorTickLen = parseFloat(document.getElementById('x-tick-length').value) || 4;
+
+            const showMinorTicks = document.getElementById('minor-ticks-show').checked;
+            const minorSubdiv = parseInt(document.getElementById('minor-tick-count').value) + 1;
+            const minorTickLen = parseFloat(document.getElementById('minor-tick-length').value) || 2.5;
+
+            const yScale = (val) => margin.top + plotHeight - ((val - yMin) / (yMax - yMin)) * plotHeight;
+
+            const legendVisible = showLegend && subGroups.length > 0 && !(subGroups.length === 1 && subGroups[0] === 'Default');
+            let legendDim = { w: 0, h: 0 };
+            if (legendVisible) {
+                const swatch = baseFontSize;
+                const rowH = swatch + legendItemGap;
+                let maxTextWidth = legendTitle ? legendTitle.replace(/<[^>]+>/g, '').length * (baseFontSize * 0.6) : 0;
+                subGroups.forEach(g => {
+                    const cleanG = g.replace(/<[^>]+>/g, '');
+                    const w = cleanG.length * (baseFontSize * 0.55) + swatch + 15;
+                    if (w > maxTextWidth) maxTextWidth = w;
+                });
+                legendDim = {
+                    w: Math.max(90, Math.round(maxTextWidth + 12)),
+                    h: Math.round((legendTitle ? baseFontSize + legendTitleGap : 6) + (subGroups.length * rowH) + 4)
+                };
+            }
+
+            if (!isLegendManuallyMoved) {
+                legendPos = {
+                    x: Math.round(margin.left + plotWidth - legendDim.w - 6),
+                    y: Math.round(margin.top + 6)
+                };
+            }
+
+            let svgContent = `
+                <defs>
+                    <pattern id="pattern-diag-right" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+                        <line x1="0" y1="0" x2="0" y2="8" stroke="${barStrokeColor}" stroke-width="${strokeWidth * 1.2}" />
+                    </pattern>
+                    <pattern id="pattern-diag-left" width="8" height="8" patternTransform="rotate(-45 0 0)" patternUnits="userSpaceOnUse">
+                        <line x1="0" y1="0" x2="0" y2="8" stroke="${barStrokeColor}" stroke-width="${strokeWidth * 1.2}" />
+                    </pattern>
+                    <pattern id="pattern-crosshatch" width="8" height="8" patternUnits="userSpaceOnUse">
+                        <path d="M 0 0 L 8 8 M 8 0 L 0 8" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
+                    </pattern>
+                    <pattern id="pattern-dots" width="8" height="8" patternUnits="userSpaceOnUse">
+                        <circle cx="4" cy="4" r="1.2" fill="${barStrokeColor}" />
+                    </pattern>
+                </defs>
+                <style>.chart-text { font-family: ${font}; }</style>
+                <rect width="100%" height="100%" fill="#ffffff"/>
+            `;
+
+            let maxTickLabelWidth = 0;
+
+            svgContent += `<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">`;
+            svgContent += `<line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>`;
+
+            ticks.forEach((tickVal, idx) => {
+                const yPos = yScale(tickVal);
+                const str = tickVal.toString();
+                if (str.length > maxTickLabelWidth) maxTickLabelWidth = str.length;
+
+                let x1 = margin.left, x2 = margin.left;
+                if (yTickDir === 'outer' || yTickDir === 'both') x1 = margin.left - yMajorTickLen;
+                if (yTickDir === 'inner' || yTickDir === 'both') x2 = margin.left + yMajorTickLen;
+
+                if (showYTicks) {
+                    svgContent += `<line x1="${x1}" y1="${yPos}" x2="${x2}" y2="${yPos}" stroke="#000000" stroke-width="${strokeWidth}"/>`;
+                }
+
+                svgContent += `<text x="${margin.left - Math.max(7, (showYTicks && (yTickDir === 'outer' || yTickDir === 'both') ? yMajorTickLen + 3 : 5))}" y="${yPos + 3.5}" font-size="${baseFontSize - 1}" text-anchor="end" fill="#000000" class="chart-text">${tickVal}</text>`;
+
+                if (showYTicks && showMinorTicks && idx < ticks.length - 1) {
+                    const nextVal = ticks[idx + 1];
+                    const stepDiff = (nextVal - tickVal) / minorSubdiv;
+                    for (let m = 1; m < minorSubdiv; m++) {
+                        const mVal = tickVal + stepDiff * m;
+                        const mY = yScale(mVal);
+                        let mx1 = margin.left, mx2 = margin.left;
+                        if (yTickDir === 'outer' || yTickDir === 'both') mx1 = margin.left - minorTickLen;
+                        if (yTickDir === 'inner' || yTickDir === 'both') mx2 = margin.left + minorTickLen;
+                        svgContent += `<line x1="${mx1}" y1="${mY}" x2="${mx2}" y2="${mY}" stroke="#000000" stroke-width="${Math.max(0.6, strokeWidth * 0.75)}"/>`;
+                    }
+                }
+            });
+            svgContent += `</g>`;
+
+            const yTitleOffset = margin.left - (maxTickLabelWidth * (baseFontSize * 0.55) + 12);
+            const yTitlePos = axisTitlePos.y || { x: Math.round(Math.max(12, yTitleOffset)), y: Math.round(margin.top + plotHeight / 2) };
+            const xTitlePos = axisTitlePos.x || { x: Math.round(margin.left + plotWidth / 2), y: Math.round(margin.top + plotHeight + margin.bottom - 10) };
+            renderedTitlePos = { x: xTitlePos, y: yTitlePos };
+
+            svgContent += `
+                <g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'x-scale-wrapper')">
+                    <line x1="${margin.left}" y1="${margin.top + plotHeight}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
+                </g>
+                
+                <g class="draggable-element axis-title-item clickable-chart-element" data-axis="y" onclick="navigateAndHighlight('annotations', 'y-title-wrapper')">
+                    <text transform="translate(${yTitlePos.x}, ${yTitlePos.y}) rotate(-90)" x="0" y="0" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(yTitleRaw, baseFontSize + 1, font)}</text>
+                </g>
+                <g class="draggable-element axis-title-item clickable-chart-element" data-axis="x" onclick="navigateAndHighlight('annotations', 'x-title-wrapper')">
+                    <text x="${xTitlePos.x}" y="${xTitlePos.y}" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xTitleRaw, baseFontSize + 1, font)}</text>
+                </g>
+            `;
+
+            const numCats = xCategories.length || 1;
+            const xGroupWidth = plotWidth / numCats;
+            const usableWidth = xGroupWidth * (1 - groupPadding);
+            const subBarWidth = Math.max(2, (usableWidth - (innerGap * (subGroups.length - 1))) / subGroups.length);
+
+            xCategories.forEach((xCat, xIdx) => {
+                const groupStartX = margin.left + (xIdx * xGroupWidth) + (xGroupWidth * groupPadding / 2);
+                const xCenter = margin.left + (xIdx * xGroupWidth) + (xGroupWidth / 2);
+
+                const tickLabelGap = (showXTicks && (xTickDir === 'outer' || xTickDir === 'both')) ? xMajorTickLen + 2 : 4;
+                
+                svgContent += `
+                    <g class="clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')" title="Click to edit data table categories">
+                        <text x="${xCenter}" y="${margin.top + plotHeight + baseFontSize + tickLabelGap}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xCat, baseFontSize, font)}</text>
+                    </g>
+                `;
+                
+                if (showXTicks) {
+                    let y1 = margin.top + plotHeight, y2 = margin.top + plotHeight;
+                    if (xTickDir === 'outer' || xTickDir === 'both') y2 = margin.top + plotHeight + xMajorTickLen;
+                    if (xTickDir === 'inner' || xTickDir === 'both') y1 = margin.top + plotHeight - xMajorTickLen;
+
+                    svgContent += `
+                        <g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'x-scale-wrapper')">
+                            <line x1="${xCenter}" y1="${y1}" x2="${xCenter}" y2="${y2}" stroke="#000000" stroke-width="${strokeWidth}"/>
+                        </g>
+                    `;
+                }
+
+                subGroups.forEach((subG, gIdx) => {
+                    const stat = summaryStats.find(s => s.x === xCat && s.group === subG);
+                    if (!stat) return;
+
+                    const barX = groupStartX + (gIdx * (subBarWidth + innerGap));
+                    const barY = yScale(stat.mean);
+                    const barH = (margin.top + plotHeight) - barY;
+                    const style = seriesStyles[subG] || { color: '#3b82f6', pattern: 'none' };
+
+                    svgContent += `
+                        <g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'series-customizer')">
+                            <rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
+                    `;
+
+                    if (style.pattern && style.pattern !== 'none') {
+                        svgContent += `<rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="url(#pattern-${style.pattern})" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
+                    }
+                    svgContent += `</g>`;
+
+                    if (stat.errPlus > 0 || stat.errMinus > 0) {
+                        const topY = yScale(stat.mean + stat.errPlus);
+                        const bottomY = yScale(Math.max(yMin, stat.mean - stat.errMinus));
+                        const midX = barX + subBarWidth / 2;
+
+                        svgContent += `
+                            <g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'tab-style')">
+                                <line x1="${midX}" y1="${topY}" x2="${midX}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+                                <line x1="${midX - capWidth / 2}" y1="${topY}" x2="${midX + capWidth / 2}" y2="${topY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+                                <line x1="${midX - capWidth / 2}" y1="${bottomY}" x2="${midX + capWidth / 2}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+                            </g>
+                        `;
+                    }
+                });
+            });
+
+            if (legendVisible) {
+                const swatchSize = baseFontSize;
+                const rowHeight = swatchSize + legendItemGap;
+
+                const boxW = legendDim.w;
+                const boxH = legendDim.h;
+
+                svgContent += `<g class="draggable-element clickable-chart-element" id="legend-group" transform="translate(${legendPos.x}, ${legendPos.y})" onclick="navigateAndHighlight('annotations', 'legend-options-wrapper')">`;
+
+                if (showLegendBox) {
+                    svgContent += `<rect x="0" y="0" width="${boxW}" height="${boxH}" fill="#ffffff" stroke="#000000" stroke-width="${strokeWidth}" rx="2"/>`;
+                }
+
+                let currentY = 12;
+                if (legendTitle) {
+                    svgContent += `<text x="6" y="${currentY}" font-size="${baseFontSize - 1}" fill="#000000" class="chart-text">${parseHTMLToSVG(legendTitle, baseFontSize - 1, font)}</text>`;
+                    currentY += legendTitleGap;
+                }
+
+                subGroups.forEach((subG, idx) => {
+                    const style = seriesStyles[subG] || { color: '#3b82f6', pattern: 'none' };
+                    const swatchY = currentY - swatchSize + 2;
+
+                    svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
+                    if (style.pattern && style.pattern !== 'none') {
+                        svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="url(#pattern-${style.pattern})" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
+                    }
+                    svgContent += `<text x="${swatchSize + 14}" y="${currentY}" font-size="${baseFontSize - 1}" fill="#000000" class="chart-text">${parseHTMLToSVG(subG, baseFontSize - 1, font)}</text>`;
+
+                    currentY += rowHeight;
+                });
+
+                svgContent += `</g>`;
+            }
+
+            annotations.forEach(ann => {
+                const noteFont = ann.fontFamily || font;
+                svgContent += `
+                    <g class="draggable-element annotation-item clickable-chart-element" data-id="${ann.id}" onclick="navigateAndHighlight('annotations', 'annotation-field-${ann.id}')">
+                        <text x="${ann.x}" y="${ann.y}" font-size="${ann.fontSize}" fill="${ann.color}" text-anchor="middle" font-family="${noteFont}" style="font-family: ${noteFont};" class="chart-text">${parseHTMLToSVG(ann.text, ann.fontSize, noteFont)}</text>
+                    </g>
+                `;
+            });
+
+            svg.innerHTML = svgContent;
+            keepItemsVisible(svgWidth, svgHeight);
+        }
+
+        function resetAxisTitles() {
+            axisTitlePos = { x: null, y: null };
+            updateChart();
+        }
+
+        function shiftIntoCanvas(g, W, H) {
+            let bb;
+            try { bb = g.getBBox(); } catch (e) { return null; }
+            if (!bb || (!bb.width && !bb.height)) return null;
+            const pad = 2;
+            let dx = 0, dy = 0;
+            if (bb.x < pad || bb.width > W - 2 * pad) dx = pad - bb.x;
+            else if (bb.x + bb.width > W - pad) dx = (W - pad) - (bb.x + bb.width);
+            if (bb.y < pad || bb.height > H - 2 * pad) dy = pad - bb.y;
+            else if (bb.y + bb.height > H - pad) dy = (H - pad) - (bb.y + bb.height);
+            if (!dx && !dy) return null;
+            g.setAttribute('transform', `translate(${dx}, ${dy})`);
+            return { dx, dy };
+        }
+
+        function keepItemsVisible(W, H) {
+            document.querySelectorAll('#chart-svg .annotation-item').forEach(g => {
+                const ann = annotations.find(a => a.id === parseInt(g.getAttribute('data-id')));
+                const sh = shiftIntoCanvas(g, W, H);
+                if (ann && sh) { ann.x = Math.round(ann.x + sh.dx); ann.y = Math.round(ann.y + sh.dy); }
+            });
+            ['x', 'y'].forEach(ax => {
+                const g = document.querySelector(`#chart-svg .axis-title-item[data-axis="${ax}"]`);
+                const sh = g && shiftIntoCanvas(g, W, H);
+                if (!sh) return;
+                renderedTitlePos[ax] = { x: renderedTitlePos[ax].x + sh.dx, y: renderedTitlePos[ax].y + sh.dy };
+                if (axisTitlePos[ax]) axisTitlePos[ax] = { x: Math.round(renderedTitlePos[ax].x), y: Math.round(renderedTitlePos[ax].y) };
+            });
+        }
+
+        function addAnnotation() {
+            const newId = annotations.length > 0 ? Math.max(...annotations.map(a => a.id)) + 1 : 1;
+            const widthMm = parseFloat(document.getElementById('svg-width-mm').value) || 90;
+            const topM = parseFloat(document.getElementById('margin-top-mm').value) || 10;
+            const fs = parseInt(document.getElementById('font-size').value) || 11;
+            annotations.push({
+                id: newId, text: 'Text',
+                x: Math.round((widthMm * MM_TO_PX) / 2), y: Math.round((topM * MM_TO_PX) + fs + 6 + (annotations.length % 6) * (fs + 8)),
+                fontSize: fs, color: '#000000', fontFamily: "Arial, Helvetica, sans-serif"
+            });
+            renderAnnotationsList();
+            updateChart();
+        }
+
+        function removeAnnotation(id) {
+            annotations = annotations.filter(a => a.id !== id);
+            renderAnnotationsList();
+            updateChart();
+        }
+
+        function renderAnnotationsList() {
+            const container = document.getElementById('annotations-list');
+            container.innerHTML = '';
+
+            annotations.forEach(ann => {
+                const f = ann.fontFamily || "Arial, Helvetica, sans-serif";
+                container.innerHTML += `
+                    <div id="annotation-field-${ann.id}" class="p-2.5 bg-slate-50 border border-slate-200 rounded text-xs space-y-2">
+                        <div class="flex justify-between items-center font-semibold">
+                            <span>Text Note #${ann.id}</span>
+                            <button onclick="removeAnnotation(${ann.id})" class="text-red-500 hover:text-red-700">
+                                <i class="fa-solid fa-trash"></i>
+                            </button>
+                        </div>
+
+                        <div class="rich-toolbar" data-target="ann-input-${ann.id}">
+                            <button type="button" class="rich-btn" data-cmd="bold" onmousedown="event.preventDefault(); execRichCmd('ann-input-${ann.id}', 'bold')" title="Bold"><b>B</b></button>
+                            <button type="button" class="rich-btn" data-cmd="italic" onmousedown="event.preventDefault(); execRichCmd('ann-input-${ann.id}', 'italic')" title="Italic"><i>I</i></button>
+                            <button type="button" class="rich-btn" data-cmd="underline" onmousedown="event.preventDefault(); execRichCmd('ann-input-${ann.id}', 'underline')" title="Underline"><u>U</u></button>
+                            <button type="button" class="rich-btn" data-cmd="subscript" onmousedown="event.preventDefault(); execRichCmd('ann-input-${ann.id}', 'subscript')" title="Subscript">x<sub>2</sub></button>
+                            <button type="button" class="rich-btn" data-cmd="superscript" onmousedown="event.preventDefault(); execRichCmd('ann-input-${ann.id}', 'superscript')" title="Superscript">x<sup>2</sup></button>
+                            <button type="button" class="rich-btn text-[10px]" data-cmd="normal" onmousedown="event.preventDefault(); execRichCmd('ann-input-${ann.id}', 'normal')" title="Clear Formatting">T<sub>x</sub></button>
+                            <button type="button" onmousedown="event.preventDefault()" onclick="openSciPicker('ann-input-${ann.id}', this)" class="sci-open-btn ml-auto"><span class="font-serif text-xs leading-none">&Omega;</span> Symbols</button>
+                        </div>
+
+                        <div id="ann-input-${ann.id}" data-rich contenteditable="true" spellcheck="false" oninput="annotations.find(a => a.id === ${ann.id}).text = this.value; updateChart();" class="rich-field"></div>
+                        
+                        <div class="grid grid-cols-3 gap-2">
+                            <div class="col-span-2">
+                                <label class="text-[10px] text-slate-500">Font Family</label>
+                                <select onchange="annotations.find(a => a.id === ${ann.id}).fontFamily = this.value; updateChart();" class="w-full text-xs p-1 border rounded">
+                                    <option value="Arial, Helvetica, sans-serif" ${f.includes('Arial') ? 'selected' : ''}>Arial / Helvetica</option>
+                                    <option value="'Courier New', Courier, monospace" ${f.includes('Courier') ? 'selected' : ''}>Courier / Monospace (DNA/Seq)</option>
+                                    <option value="'Times New Roman', Times, serif" ${f.includes('Times') ? 'selected' : ''}>Times New Roman</option>
+                                    <option value="Calibri, 'Segoe UI', sans-serif" ${f.includes('Calibri') ? 'selected' : ''}>Calibri</option>
+                                    <option value="Georgia, serif" ${f.includes('Georgia') ? 'selected' : ''}>Georgia</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] text-slate-500">Size (pt)</label>
+                                <input type="number" value="${ann.fontSize}" onchange="annotations.find(a => a.id === ${ann.id}).fontSize = parseInt(this.value); updateChart();" class="w-full text-xs p-1 border rounded">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-slate-500">Color</label>
+                            <input type="color" value="${ann.color}" onchange="annotations.find(a => a.id === ${ann.id}).color = this.value; updateChart();" class="w-full h-7 p-0 border rounded cursor-pointer">
+                        </div>
+                    </div>
+                `;
+            });
+            annotations.forEach(ann => {
+                const el = document.getElementById('ann-input-' + ann.id);
+                if (el) { makeRichField(el); el.value = ann.text; }
+            });
+        }
+
+        function setupDragAndDrop() {
+            const svg = document.getElementById('chart-svg');
+            let activeTarget = null;
+            let startMouse = { x: 0, y: 0 };
+            let initialPos = { x: 0, y: 0 };
+
+            svg.addEventListener('mousedown', (e) => {
+                const legendEl = e.target.closest('#legend-group');
+                const annEl = e.target.closest('.annotation-item');
+                const titleEl = e.target.closest('.axis-title-item');
+
+                if (legendEl) {
+                    activeTarget = { type: 'legend' };
+                    initialPos = { ...legendPos };
+                    isLegendManuallyMoved = true;
+                } else if (titleEl) {
+                    const axis = titleEl.getAttribute('data-axis');
+                    activeTarget = { type: 'axis-title', axis };
+                    initialPos = { ...renderedTitlePos[axis] };
+                } else if (annEl) {
+                    const id = parseInt(annEl.getAttribute('data-id'));
+                    const ann = annotations.find(a => a.id === id);
+                    if (ann) {
+                        activeTarget = { type: 'annotation', item: ann };
+                        initialPos = { x: ann.x, y: ann.y };
+                    }
+                }
+
+                if (activeTarget) {
+                    const CTM = svg.getScreenCTM();
+                    startMouse = {
+                        x: (e.clientX - CTM.e) / CTM.a,
+                        y: (e.clientY - CTM.f) / CTM.d
+                    };
+                }
+            });
+
+            svg.addEventListener('mousemove', (e) => {
+                if (!activeTarget) return;
+
+                const CTM = svg.getScreenCTM();
+                const currentMouse = {
+                    x: (e.clientX - CTM.e) / CTM.a,
+                    y: (e.clientY - CTM.f) / CTM.d
+                };
+
+                const dx = currentMouse.x - startMouse.x;
+                const dy = currentMouse.y - startMouse.y;
+
+                if (activeTarget.type === 'legend') {
+                    legendPos.x = Math.round(initialPos.x + dx);
+                    legendPos.y = Math.round(initialPos.y + dy);
+                } else if (activeTarget.type === 'axis-title') {
+                    axisTitlePos[activeTarget.axis] = { x: Math.round(initialPos.x + dx), y: Math.round(initialPos.y + dy) };
+                } else if (activeTarget.type === 'annotation') {
+                    activeTarget.item.x = Math.round(initialPos.x + dx);
+                    activeTarget.item.y = Math.round(initialPos.y + dy);
+                }
+
+                updateChart();
+            });
+
+            window.addEventListener('mouseup', () => {
+                activeTarget = null;
+            });
+        }
+
+        function getStyleConfig() {
+            return {
+                fontFamily: document.getElementById('font-family').value,
+                fontSize: document.getElementById('font-size').value,
+                universalStrokeWidth: document.getElementById('universal-stroke-width').value,
+                capWidth: document.getElementById('cap-width').value,
+                groupPadding: document.getElementById('group-padding').value,
+                barGap: document.getElementById('bar-gap').value,
+                colorPalette: document.getElementById('color-palette').value,
+                legendShow: document.getElementById('legend-show').checked,
+                legendBox: document.getElementById('legend-box').checked,
+                legendItemGap: document.getElementById('legend-item-gap').value,
+                legendTitleGap: document.getElementById('legend-title-gap').value,
+                widthMm: document.getElementById('svg-width-mm').value,
+                heightMm: document.getElementById('svg-height-mm').value,
+                marginTopMm: document.getElementById('margin-top-mm').value,
+                marginBottomMm: document.getElementById('margin-bottom-mm').value,
+                marginLeftMm: document.getElementById('margin-left-mm').value,
+                marginRightMm: document.getElementById('margin-right-mm').value,
+                yTicksShow: document.getElementById('y-ticks-show').checked,
+                tickDirection: document.getElementById('tick-direction').value,
+                tickLength: document.getElementById('tick-length').value,
+                xTicksShow: document.getElementById('x-ticks-show').checked,
+                xTickDirection: document.getElementById('x-tick-direction').value,
+                xTickLength: document.getElementById('x-tick-length').value,
+                minorTicksShow: document.getElementById('minor-ticks-show').checked,
+                minorTickCount: document.getElementById('minor-tick-count').value,
+                minorTickLength: document.getElementById('minor-tick-length').value,
+                seriesStyles: seriesStyles,
+                annotations: annotations
+            };
+        }
+
+        function applyStyleConfig(cfg) {
+            if (!cfg) return;
+            if (cfg.fontFamily) document.getElementById('font-family').value = cfg.fontFamily;
+            if (cfg.fontSize) document.getElementById('font-size').value = cfg.fontSize;
+            if (cfg.universalStrokeWidth) document.getElementById('universal-stroke-width').value = cfg.universalStrokeWidth;
+            if (cfg.capWidth) document.getElementById('cap-width').value = cfg.capWidth;
+            if (cfg.groupPadding) document.getElementById('group-padding').value = cfg.groupPadding;
+            if (cfg.barGap) document.getElementById('bar-gap').value = cfg.barGap;
+            if (cfg.colorPalette) document.getElementById('color-palette').value = cfg.colorPalette;
+            if (cfg.legendShow !== undefined) document.getElementById('legend-show').checked = cfg.legendShow;
+            if (cfg.legendBox !== undefined) document.getElementById('legend-box').checked = cfg.legendBox;
+            if (cfg.legendItemGap) document.getElementById('legend-item-gap').value = cfg.legendItemGap;
+            if (cfg.legendTitleGap) document.getElementById('legend-title-gap').value = cfg.legendTitleGap;
+            if (cfg.widthMm) document.getElementById('svg-width-mm').value = cfg.widthMm;
+            if (cfg.heightMm) document.getElementById('svg-height-mm').value = cfg.heightMm;
+            if (cfg.marginTopMm) document.getElementById('margin-top-mm').value = cfg.marginTopMm;
+            if (cfg.marginBottomMm) document.getElementById('margin-bottom-mm').value = cfg.marginBottomMm;
+            if (cfg.marginLeftMm) document.getElementById('margin-left-mm').value = cfg.marginLeftMm;
+            if (cfg.marginRightMm) document.getElementById('margin-right-mm').value = cfg.marginRightMm;
+            if (cfg.yTicksShow !== undefined) document.getElementById('y-ticks-show').checked = cfg.yTicksShow;
+            if (cfg.tickDirection) document.getElementById('tick-direction').value = cfg.tickDirection;
+            if (cfg.tickLength) document.getElementById('tick-length').value = cfg.tickLength;
+            if (cfg.xTicksShow !== undefined) document.getElementById('x-ticks-show').checked = cfg.xTicksShow;
+            if (cfg.xTickDirection) document.getElementById('x-tick-direction').value = cfg.xTickDirection;
+            if (cfg.xTickLength) document.getElementById('x-tick-length').value = cfg.xTickLength;
+            if (cfg.minorTicksShow !== undefined) document.getElementById('minor-ticks-show').checked = cfg.minorTicksShow;
+            if (cfg.minorTickCount) document.getElementById('minor-tick-count').value = cfg.minorTickCount;
+            if (cfg.minorTickLength) document.getElementById('minor-tick-length').value = cfg.minorTickLength;
+            if (cfg.seriesStyles) seriesStyles = cfg.seriesStyles;
+            if (cfg.annotations) { annotations = cfg.annotations; renderAnnotationsList(); }
+
+            renderSeriesCustomizer();
+            updateChart();
+        }
+
+        function saveCurrentStyleProfile() {
+            const nameInput = document.getElementById('profile-name-input');
+            const name = nameInput.value.trim() || `Profile ${Date.now()}`;
+            const config = getStyleConfig();
+
+            let saved = JSON.parse(localStorage.getItem('easybar_profiles') || '{}');
+            saved[name] = config;
+            localStorage.setItem('easybar_profiles', JSON.stringify(saved));
+
+            nameInput.value = '';
+            renderSavedProfilesList();
+        }
+
+        function loadStyleProfile(name) {
+            let saved = JSON.parse(localStorage.getItem('easybar_profiles') || '{}');
+            if (saved[name]) {
+                applyStyleConfig(saved[name]);
+            }
+        }
+
+        function deleteStyleProfile(name) {
+            let saved = JSON.parse(localStorage.getItem('easybar_profiles') || '{}');
+            delete saved[name];
+            localStorage.setItem('easybar_profiles', JSON.stringify(saved));
+            renderSavedProfilesList();
+        }
+
+        function renderSavedProfilesList() {
+            const container = document.getElementById('profiles-list');
+            let saved = JSON.parse(localStorage.getItem('easybar_profiles') || '{}');
+            const keys = Object.keys(saved);
+
+            if (keys.length === 0) {
+                container.innerHTML = `<p class="text-xs text-slate-400 italic">No saved presets yet.</p>`;
+                return;
+            }
+
+            container.innerHTML = '';
+            keys.forEach(k => {
+                container.innerHTML += `
+                    <div class="flex items-center justify-between p-2 bg-slate-50 border border-slate-200 rounded text-xs">
+                        <span class="font-medium text-slate-700 truncate max-w-[180px]">${k}</span>
+                        <div class="flex gap-1.5">
+                            <button onclick="loadStyleProfile('${k}')" class="bg-blue-50 text-blue-600 hover:bg-blue-100 px-2 py-0.5 rounded text-[11px] font-semibold">Load</button>
+                            <button onclick="deleteStyleProfile('${k}')" class="text-red-500 hover:text-red-700 px-1"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        function exportStyleJSON() {
+            const config = getStyleConfig();
+            const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'easy_bar_chart_profile.json';
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        function importStyleJSON(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const cfg = JSON.parse(e.target.result);
+                    applyStyleConfig(cfg);
+                } catch (err) {
+                    alert('Invalid JSON style profile');
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        function exportSVG() {
+            const svg = document.getElementById('chart-svg');
+            const serializer = new XMLSerializer();
+            let source = serializer.serializeToString(svg);
+
+            if (!source.match(/^<svg[^>]+xmlns="http\:\/\/www\.w3\.org\/2000\/svg"/)) {
+                source = source.replace(/^<svg/, '<svg xmlns="http://www.w3.org/2000/svg"');
+            }
+
+            const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'scientific_bar_chart.svg';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportPDF() {
+            const { jsPDF } = window.jspdf;
+            const widthMm = parseFloat(document.getElementById('svg-width-mm').value) || 90;
+            const heightMm = parseFloat(document.getElementById('svg-height-mm').value) || 65;
+
+            const svg = document.getElementById('chart-svg');
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svg);
+
+            const canvas = document.createElement('canvas');
+            const scale = 4; // High resolution rendering for vector crispness
+            const widthPx = parseInt(svg.getAttribute('width')) || 580;
+            const heightPx = parseInt(svg.getAttribute('height')) || 380;
+
+            canvas.width = widthPx * scale;
+            canvas.height = heightPx * scale;
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+
+            const img = new Image();
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = function () {
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+
+                const imgData = canvas.toDataURL('image/png');
+                const pdf = new jsPDF({
+                    orientation: widthMm >= heightMm ? 'l' : 'p',
+                    unit: 'mm',
+                    format: [widthMm, heightMm]
+                });
+
+                pdf.addImage(imgData, 'PNG', 0, 0, widthMm, heightMm);
+                pdf.save('scientific_bar_chart.pdf');
+            };
+
+            img.src = url;
+        }
+
+        function exportPNG(dpi = 300) {
+            const svg = document.getElementById('chart-svg');
+            const serializer = new XMLSerializer();
+            const svgString = serializer.serializeToString(svg);
+
+            const scale = dpi / 96;
+            const canvas = document.createElement('canvas');
+            const width = parseInt(svg.getAttribute('width')) || 580;
+            const height = parseInt(svg.getAttribute('height')) || 380;
+
+            canvas.width = width * scale;
+            canvas.height = height * scale;
+
+            const ctx = canvas.getContext('2d');
+            ctx.scale(scale, scale);
+
+            const img = new Image();
+            const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' });
+            const url = URL.createObjectURL(svgBlob);
+
+            img.onload = function () {
+                ctx.drawImage(img, 0, 0);
+                URL.revokeObjectURL(url);
+
+                const imgURI = canvas.toDataURL('image/png');
+                const a = document.createElement('a');
+                a.href = imgURI;
+                a.download = `scientific_bar_chart_${dpi}dpi.png`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+            };
+
+            img.src = url;
+        }
+    </script>
+</body>
+</html>
