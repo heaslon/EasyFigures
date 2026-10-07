@@ -100,6 +100,76 @@
             0% { background-color: #fef08a; border-color: #eab308; }
             100% { background-color: transparent; }
         }
+		.palette-preview {
+			display: flex;
+			gap: 2px;
+			margin-top: 4px;
+			height: 14px;
+			border-radius: 3px;
+			overflow: hidden;
+			border: 1px solid #cbd5e1;
+		}
+		.palette-preview span {
+			flex: 1;
+			display: block;
+		}
+		.mono-base-row {
+			display: flex;
+			align-items: center;
+			gap: 8px;
+			margin-top: 6px;
+			padding: 6px 8px;
+			background: #f8fafc;
+			border: 1px solid #e2e8f0;
+			border-radius: 4px;
+		}
+		.mono-base-row label {
+			font-size: 11px;
+			font-weight: 500;
+			color: #475569;
+		}
+		.palette-swatches {
+			display: flex;
+			gap: 3px;
+			flex-wrap: wrap;
+		}
+		.palette-swatch {
+			width: 34px;
+			height: 34px;
+			border-radius: 4px;
+			border: 1px solid #cbd5e1;
+			cursor: pointer;
+			padding: 0;
+			transition: transform 0.1s ease, border-color 0.1s ease;
+		}
+		.palette-swatch:hover {
+			transform: scale(1.08);
+			border-color: #3b82f6;
+		}
+		.palette-swatch.active {
+			border: 2px solid #2563eb;
+			box-shadow: 0 0 0 1px #fff inset;
+		}
+		input[type="color"] {
+			width: 64px;
+			height: 40px;
+			padding: 0;
+			border: 1px solid #cbd5e1;
+			border-radius: 4px;
+			cursor: pointer;
+			background: #fff;
+		}
+		input[type="color"]::-webkit-color-swatch-wrapper {
+			padding: 2px;
+		}
+		input[type="color"]::-webkit-color-swatch {
+			border: none;
+			border-radius: 3px;
+		}
+		input[type="color"]::-moz-color-swatch {
+			border: none;
+			border-radius: 3px;
+		}
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
@@ -192,16 +262,23 @@
                 <!-- 1. Palettes & Series Customization + Gaps -->
                 <div class="space-y-3">
                     <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Palettes & Bar Customization</h3>
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Color Palette</label>
-                        <select id="color-palette" onchange="applyColorPalette()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                            <option value="colorblind" selected>Colorblind Safe</option>
-                            <option value="grayscale">Classic Grayscale</option>
-                            <option value="warm">Warm Academic</option>
-                            <option value="cool">Cool Tech</option>
-                            <option value="pastel">Muted Pastel</option>
-                        </select>
-                    </div>
+				<div>
+					<label class="block text-[11px] font-medium text-slate-600 mb-1">Color Palette</label>
+					<select id="color-palette" onchange="applyColorPalette()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+						<option value="okabe-ito" selected>Okabe-Ito (Colorblind Safe)</option>
+						<option value="tol-bright">Tol Bright (Colorblind Safe)</option>
+						<option value="tol-muted">Tol Muted (Colorblind Safe)</option>
+						<option value="wong">Wong (Nature Methods)</option>
+						<option value="grayscale">Grayscale (B&amp;W Print)</option>
+						<option value="mono">Monochrome (Single Color)</option>
+					</select>
+					<div id="palette-preview" class="palette-preview"></div>
+					<div id="mono-base-row" class="mono-base-row hidden">
+						<label>Base Color</label>
+						<input type="color" id="mono-base-color" value="#3b82f6" oninput="updateChart();" onchange="applyColorPalette();" class="w-10 h-8 p-0 border border-slate-300 rounded cursor-pointer">
+						<span class="text-[10px] text-slate-400">All bars use this color.</span>
+					</div>
+				</div>
 
                     <div class="grid grid-cols-2 gap-2 pt-1">
                         <div>
@@ -590,13 +667,38 @@
 
         const MM_TO_PX = 96 / 25.4;
 
-        const PALETTES = {
-            'colorblind': ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7'],
-            'grayscale': ['#333333', '#888888', '#cccccc', '#000000', '#eeeeee'],
-            'warm': ['#C0392B', '#E67E22', '#F1C40F', '#D35400', '#E74C3C'],
-            'cool': ['#2980B9', '#16A085', '#27AE60', '#8E44AD', '#34495E'],
-            'pastel': ['#779ECB', '#FF6961', '#03C03C', '#F49AC2', '#CB99C9']
-        };
+		const PALETTES = {
+			// Okabe & Ito (2008) — the standard colorblind-safe palette for scientific figures
+			'okabe-ito': ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7'],
+
+			// Paul Tol "Bright" — colorblind-safe, higher saturation, designed for scientific charts
+			'tol-bright': ['#4477AA', '#EE6677', '#228833', '#CCBB44', '#66CCEE', '#AA3377', '#BBBBBB'],
+
+			// Paul Tol "Muted" — colorblind-safe, subdued, works well for print
+			'tol-muted': ['#332288', '#88CCEE', '#44AA99', '#117733', '#999933', '#DDCC77', '#CC6677', '#882255', '#AA4499'],
+
+			// Wong (2011) Nature Methods — reordered to put usable colors first; black omitted
+			// to avoid collision with black error bars and axis lines.
+			'wong': ['#0072B2', '#E69F00', '#009E73', '#F0E442', '#56B4E9', '#D55E00', '#CC79A7'],
+			
+			// Grayscale — capped at 4 steps and black-free so series stay distinct from
+			// black error bars, axis lines, and significance markers.
+			'grayscale': ['#737373', '#a6a6a6', '#404040', '#cccccc']
+		};
+		const MONO_DEFAULT = '#3b82f6';
+
+		function getActivePaletteColors() {
+			const key = document.getElementById('color-palette').value;
+			if (key === 'mono') {
+				const base = document.getElementById('mono-base-color').value || MONO_DEFAULT;
+				return [base];
+			}
+			return PALETTES[key] || PALETTES['okabe-ito'];
+		}
+
+function isMonoPalette() {
+    return document.getElementById('color-palette').value === 'mono';
+}
 
         const SAMPLE_COLS = [
             { header: 'Experience', role: 'x' },
@@ -622,6 +724,8 @@
             renderAnnotationsList();
             renderRefLinesList();
             onLogScaleToggle();
+			updatePalettePreview();
+			updateMonoRowVisibility();
             if (window.ResizeObserver) {
                 new ResizeObserver(() => {
                     if (zoomMode === 'fit') applyZoom();
@@ -1251,27 +1355,36 @@
             updateChart();
         }
 
-        function ensureSeriesStyles() {
-            const colors = PALETTES[document.getElementById('color-palette').value] || PALETTES['colorblind'];
-            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
-            const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
+		function ensureSeriesStyles() {
+			const colors = getActivePaletteColors();
+			const mono = isMonoPalette();
+			const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+			const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
 
-            if (subGroups.length === 1 && subGroups[0] === 'Default') {
-                if (!Array.isArray(categoryStyles) || categoryStyles.length !== xCats.length) {
-                    categoryStyles = xCats.map((_, idx) => ({
-                        color: colors[idx % colors.length],
-                        pattern: 'none'
-                    }));
-                }
-            } else {
-                if (!Array.isArray(seriesStyles) || seriesStyles.length !== subGroups.length) {
-                    seriesStyles = subGroups.map((_, idx) => ({
-                        color: colors[idx % colors.length],
-                        pattern: 'none'
-                    }));
-                }
-            }
-        }
+			if (mono) {
+				const base = colors[0];
+				if (!Array.isArray(categoryStyles) || categoryStyles.length !== xCats.length) {
+					categoryStyles = xCats.map(() => ({ color: base, pattern: 'none' }));
+				}
+				if (!Array.isArray(seriesStyles) || seriesStyles.length !== subGroups.length) {
+					seriesStyles = subGroups.map(() => ({ color: base, pattern: 'none' }));
+				}
+			} else if (subGroups.length === 1 && subGroups[0] === 'Default') {
+				if (!Array.isArray(categoryStyles) || categoryStyles.length !== xCats.length) {
+					categoryStyles = xCats.map((_, idx) => ({
+						color: colors[idx % colors.length],
+						pattern: 'none'
+					}));
+				}
+			} else {
+				if (!Array.isArray(seriesStyles) || seriesStyles.length !== subGroups.length) {
+					seriesStyles = subGroups.map((_, idx) => ({
+						color: colors[idx % colors.length],
+						pattern: 'none'
+					}));
+				}
+			}
+		}
 
         function calculateNiceTicks(min, max, maxTicks = 5) {
             if (min === max) return { ticks: [min, max], min, max, step: 1 };
@@ -1295,93 +1408,149 @@
             return { ticks, min: niceMin, max: niceMax, step: niceStep };
         }
 
-        function applyColorPalette() {
-            const paletteKey = document.getElementById('color-palette').value;
-            const colors = PALETTES[paletteKey] || PALETTES['colorblind'];
-            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
-            const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
+		function applyColorPalette() {
+			const colors = getActivePaletteColors();
+			const mono = isMonoPalette();
+			const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+			const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
 
-            if (subGroups.length === 1 && subGroups[0] === 'Default') {
-                categoryStyles = xCats.map((_, idx) => ({
-                    color: colors[idx % colors.length],
-                    pattern: 'none'
-                }));
-            } else {
-                seriesStyles = subGroups.map((_, idx) => ({
-                    color: colors[idx % colors.length],
-                    pattern: 'none'
-                }));
-            }
-            renderSeriesCustomizer();
-            updateChart();
-        }
+			if (mono) {
+				const base = colors[0];
+				categoryStyles = xCats.map(() => ({ color: base, pattern: 'none' }));
+				seriesStyles = subGroups.map(() => ({ color: base, pattern: 'none' }));
+			} else if (subGroups.length === 1 && subGroups[0] === 'Default') {
+				categoryStyles = xCats.map((_, idx) => ({
+					color: colors[idx % colors.length],
+					pattern: 'none'
+				}));
+			} else {
+				seriesStyles = subGroups.map((_, idx) => ({
+					color: colors[idx % colors.length],
+					pattern: 'none'
+				}));
+			}
+			updatePalettePreview();
+			updateMonoRowVisibility();
+			renderSeriesCustomizer();
+			updateChart();
+		}
 
-        function renderSeriesCustomizer() {
-            const container = document.getElementById('series-customizer');
-            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
-            const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
-            container.innerHTML = '';
+		function updatePalettePreview() {
+			const preview = document.getElementById('palette-preview');
+			if (!preview) return;
+			const colors = getActivePaletteColors();
+			preview.innerHTML = colors.map(c => `<span style="background:${c}"></span>`).join('');
+		}
 
-            ensureSeriesStyles();
+		function updateMonoRowVisibility() {
+			const row = document.getElementById('mono-base-row');
+			if (!row) return;
+			row.classList.toggle('hidden', !isMonoPalette());
+		}
 
-            if (subGroups.length === 1 && subGroups[0] === 'Default') {
-                xCats.forEach((cat, idx) => {
-                    const style = categoryStyles[idx] || { color: '#3b82f6', pattern: 'none' };
-                    const cleanCatName = parseHTMLToSVG(cat, 12, 'sans-serif').replace(/<[^>]+>/g, '');
-                    container.innerHTML += `
-                        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
-                            <div class="text-xs font-bold text-slate-700 flex justify-between items-center">
-                                <span>Category: ${cleanCatName}</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-[10px] text-slate-500">Fill Color</label>
-                                    <input type="color" value="${style.color}" oninput="categoryStyles[${idx}].color = this.value; updateChart();" class="w-full h-7 p-0 border border-slate-300 rounded cursor-pointer">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] text-slate-500">Hatching</label>
-                                    <select onchange="categoryStyles[${idx}].pattern = this.value; updateChart();" class="w-full text-xs p-1 border border-slate-300 rounded">
-                                        <option value="none" ${style.pattern === 'none' ? 'selected' : ''}>Solid Fill</option>
-                                        <option value="diag-right" ${style.pattern === 'diag-right' ? 'selected' : ''}>Diagonal Right</option>
-                                        <option value="diag-left" ${style.pattern === 'diag-left' ? 'selected' : ''}>Diagonal Left</option>
-                                        <option value="crosshatch" ${style.pattern === 'crosshatch' ? 'selected' : ''}>Crosshatch</option>
-                                        <option value="dots" ${style.pattern === 'dots' ? 'selected' : ''}>Dots</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-            } else {
-                subGroups.forEach((g, idx) => {
-                    const style = seriesStyles[idx] || { color: '#3b82f6', pattern: 'none' };
-                    const groupLabelClean = parseHTMLToSVG(g, 12, 'sans-serif').replace(/<[^>]+>/g, '');
-                    container.innerHTML += `
-                        <div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
-                            <div class="text-xs font-bold text-slate-700 flex justify-between items-center">
-                                <span>Group: ${groupLabelClean}</span>
-                            </div>
-                            <div class="grid grid-cols-2 gap-2">
-                                <div>
-                                    <label class="block text-[10px] text-slate-500">Fill Color</label>
-                                    <input type="color" value="${style.color}" oninput="seriesStyles[${idx}].color = this.value; updateChart();" class="w-full h-7 p-0 border border-slate-300 rounded cursor-pointer">
-                                </div>
-                                <div>
-                                    <label class="block text-[10px] text-slate-500">Hatching</label>
-                                    <select onchange="seriesStyles[${idx}].pattern = this.value; updateChart();" class="w-full text-xs p-1 border border-slate-300 rounded">
-                                        <option value="none" ${style.pattern === 'none' ? 'selected' : ''}>Solid Fill</option>
-                                        <option value="diag-right" ${style.pattern === 'diag-right' ? 'selected' : ''}>Diagonal Right</option>
-                                        <option value="diag-left" ${style.pattern === 'diag-left' ? 'selected' : ''}>Diagonal Left</option>
-                                        <option value="crosshatch" ${style.pattern === 'crosshatch' ? 'selected' : ''}>Crosshatch</option>
-                                        <option value="dots" ${style.pattern === 'dots' ? 'selected' : ''}>Dots</option>
-                                    </select>
-                                </div>
-                            </div>
-                        </div>
-                    `;
-                });
-            }
-        }
+		 function renderSeriesCustomizer() {
+			const container = document.getElementById('series-customizer');
+			const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+			const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
+			const mono = isMonoPalette();
+			const paletteColors = getActivePaletteColors();
+			container.innerHTML = '';
+
+			ensureSeriesStyles();
+
+			// Build the swatch row HTML for a given current color
+			const swatchRow = (currentColor, targetExpr) => {
+				if (mono) return '';
+				return `<div class="palette-swatches">` +
+					paletteColors.map(c =>
+						`<button type="button" class="palette-swatch${c.toLowerCase() === currentColor.toLowerCase() ? ' active' : ''}"
+							style="background:${c}"
+							title="${c}"
+							onclick="${targetExpr}.color = '${c}'; renderSeriesCustomizer(); updateChart();"></button>`
+					).join('') +
+					`</div>`;
+			};
+
+			if (mono) {
+				// Single control — one color for the whole chart
+				const base = paletteColors[0];
+				container.innerHTML = `
+					<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+						<div class="text-xs font-bold text-slate-700">Monochrome Fill</div>
+						<p class="text-[10px] text-slate-500">All bars share a single color. Change the base color above.</p>
+						<div class="flex items-center gap-2">
+						<input type="color" value="${base}"
+							oninput="document.getElementById('mono-base-color').value = this.value; updateChart();"
+							onchange="document.getElementById('mono-base-color').value = this.value; applyColorPalette();"
+							class="w-full h-8 p-0 border border-slate-300 rounded cursor-pointer">
+						</div>
+					</div>
+				`;
+				return;
+			}
+
+			if (subGroups.length === 1 && subGroups[0] === 'Default') {
+				xCats.forEach((cat, idx) => {
+					const style = categoryStyles[idx] || { color: '#3b82f6', pattern: 'none' };
+					const cleanCatName = parseHTMLToSVG(cat, 12, 'sans-serif').replace(/<[^>]+>/g, '');
+					const target = `categoryStyles[${idx}]`;
+					container.innerHTML += `
+						<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+							<div class="text-xs font-bold text-slate-700 flex justify-between items-center">
+								<span>Category: ${cleanCatName}</span>
+							</div>
+							<div class="space-y-1.5">
+								<label class="block text-[10px] text-slate-500">Fill Color</label>
+								<div class="flex items-center gap-2">
+									<input type="color" value="${style.color}" oninput="${target}.color = this.value; updateChart();" onchange="${target}.color = this.value; renderSeriesCustomizer(); updateChart();" class="w-10 h-7 p-0 border border-slate-300 rounded cursor-pointer">
+									${swatchRow(style.color, target)}
+								</div>
+							</div>
+							<div>
+								<label class="block text-[10px] text-slate-500">Hatching</label>
+								<select onchange="${target}.pattern = this.value; updateChart();" class="w-full text-xs p-1 border border-slate-300 rounded">
+									<option value="none" ${style.pattern === 'none' ? 'selected' : ''}>Solid Fill</option>
+									<option value="diag-right" ${style.pattern === 'diag-right' ? 'selected' : ''}>Diagonal Right</option>
+									<option value="diag-left" ${style.pattern === 'diag-left' ? 'selected' : ''}>Diagonal Left</option>
+									<option value="crosshatch" ${style.pattern === 'crosshatch' ? 'selected' : ''}>Crosshatch</option>
+									<option value="dots" ${style.pattern === 'dots' ? 'selected' : ''}>Dots</option>
+								</select>
+							</div>
+						</div>
+					`;
+				});
+			} else {
+				subGroups.forEach((g, idx) => {
+					const style = seriesStyles[idx] || { color: '#3b82f6', pattern: 'none' };
+					const groupLabelClean = parseHTMLToSVG(g, 12, 'sans-serif').replace(/<[^>]+>/g, '');
+					const target = `seriesStyles[${idx}]`;
+					container.innerHTML += `
+						<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
+							<div class="text-xs font-bold text-slate-700 flex justify-between items-center">
+								<span>Group: ${groupLabelClean}</span>
+							</div>
+							<div class="space-y-1.5">
+								<label class="block text-[10px] text-slate-500">Fill Color</label>
+								<div class="flex items-center gap-2">
+									<input type="color" value="${style.color}" oninput="${target}.color = this.value; updateChart();" onchange="${target}.color = this.value; renderSeriesCustomizer(); updateChart();" class="w-10 h-7 p-0 border border-slate-300 rounded cursor-pointer">
+									${swatchRow(style.color, target)}
+								</div>
+							</div>
+							<div>
+								<label class="block text-[10px] text-slate-500">Hatching</label>
+								<select onchange="${target}.pattern = this.value; updateChart();" class="w-full text-xs p-1 border border-slate-300 rounded">
+									<option value="none" ${style.pattern === 'none' ? 'selected' : ''}>Solid Fill</option>
+									<option value="diag-right" ${style.pattern === 'diag-right' ? 'selected' : ''}>Diagonal Right</option>
+									<option value="diag-left" ${style.pattern === 'diag-left' ? 'selected' : ''}>Diagonal Left</option>
+									<option value="crosshatch" ${style.pattern === 'crosshatch' ? 'selected' : ''}>Crosshatch</option>
+									<option value="dots" ${style.pattern === 'dots' ? 'selected' : ''}>Dots</option>
+								</select>
+							</div>
+						</div>
+					`;
+				});
+			}
+		}
 
         function repositionLegendAuto() {
             isLegendManuallyMoved = false;
@@ -2017,6 +2186,7 @@
                 seriesStyles: seriesStyles,
                 categoryStyles: categoryStyles,
                 annotations: annotations,
+				monoBaseColor: document.getElementById('mono-base-color').value,
                 refLines: refLines
             };
         }
@@ -2024,6 +2194,7 @@
         function applyStyleConfig(cfg) {
             if (!cfg) return;
             if (cfg.fontFamily) document.getElementById('font-family').value = cfg.fontFamily;
+			if (cfg.monoBaseColor) document.getElementById('mono-base-color').value = cfg.monoBaseColor;
             if (cfg.fontSize) document.getElementById('font-size').value = cfg.fontSize;
             if (cfg.universalStrokeWidth) document.getElementById('universal-stroke-width').value = cfg.universalStrokeWidth;
             if (cfg.capWidth) document.getElementById('cap-width').value = cfg.capWidth;
@@ -2038,6 +2209,8 @@
             if (cfg.categoryStyles) categoryStyles = cfg.categoryStyles;
             if (cfg.annotations) { annotations = cfg.annotations; renderAnnotationsList(); }
             if (cfg.refLines) { refLines = cfg.refLines; renderRefLinesList(); }
+			updatePalettePreview();
+			updateMonoRowVisibility();
             renderSeriesCustomizer();
             updateChart();
         }
