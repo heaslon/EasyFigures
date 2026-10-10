@@ -255,6 +255,7 @@
                     <button onclick="addColumn()" class="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 font-semibold px-2 py-1 rounded border border-blue-200">+ Column</button>
                 </div>
                 <p id="data-status" class="text-[11px] text-slate-500"></p>
+				<p id="data-hint" class="text-[11px] text-amber-600 hidden"></p>
             </div>
 
             <!-- TAB 2: STYLE -->
@@ -270,12 +271,14 @@
 						<option value="tol-muted">Tol Muted (Colorblind Safe)</option>
 						<option value="wong">Wong (Nature Methods)</option>
 						<option value="grayscale">Grayscale (B&amp;W Print)</option>
-						<option value="mono">Monochrome (Single Color)</option>
+						<option value="mono">Single Color</option>
 					</select>
 					<div id="palette-preview" class="palette-preview"></div>
 					<div id="mono-base-row" class="mono-base-row hidden">
 						<label>Base Color</label>
-						<input type="color" id="mono-base-color" value="#3b82f6" oninput="updateChart();" onchange="applyColorPalette();" class="w-10 h-8 p-0 border border-slate-300 rounded cursor-pointer">
+						<input type="color" id="mono-base-color" value="#3b82f6"
+							   oninput="updateChart(); updatePalettePreview();"
+							   class="w-10 h-8 p-0 border border-slate-300 rounded cursor-pointer">
 						<span class="text-[10px] text-slate-400">All bars use this color.</span>
 					</div>
 				</div>
@@ -300,11 +303,11 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[11px] font-medium text-slate-600 mb-1">Width (mm)</label>
-                            <input type="number" id="svg-width-mm" value="90" step="1" min="40" max="500" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <input type="number" id="svg-width-mm" value="90" step="0.5" min="40" max="500" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                         </div>
                         <div>
                             <label class="block text-[11px] font-medium text-slate-600 mb-1">Height (mm)</label>
-                            <input type="number" id="svg-height-mm" value="65" step="1" min="40" max="500" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <input type="number" id="svg-height-mm" value="65" step="0.5" min="40" max="500" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                         </div>
                     </div>
                 </div>
@@ -332,20 +335,27 @@
                     </div>
                 </div>
 
-                <!-- 4. Universal Line Weight & Spacing -->
+                <!-- 4. Line Weight-->
                 <div class="border-t border-slate-200 pt-4 space-y-3">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Universal Line Weight & Spacing</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Line Weight</h3>
                     
                     <div>
                         <label class="block text-[11px] font-medium text-slate-600 mb-1">Universal Line Weight (pt)</label>
-                        <input type="number" id="universal-stroke-width" value="1.2" min="0.2" max="5" step="0.1" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                    </div>
-
-                    <div>
-                        <label class="block text-[11px] font-medium text-slate-600 mb-1">Error Cap Width (px)</label>
-                        <input type="number" id="cap-width" value="8" min="0" max="30" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        <input type="number" id="universal-stroke-width" value="0.9" min="0.2" max="2" step="0.1" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                     </div>
                 </div>
+				
+				<!-- 5. Error Bar Styling -->
+				<div id="error-bars-wrapper" class="border-t border-slate-200 pt-4 space-y-3">
+					<h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">Error Bars</h3>
+					<div>
+						<label class="block text-[11px] font-medium text-slate-600 mb-1">Cap Width (px, 0 = no cap)</label>
+						<input type="number" id="cap-width" value="8" min="0" max="30" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+					</div>
+				</div>
+				
+				
+				
             </div>
 
             <!-- TAB 3: TEXT, LABELS & ANNOTATIONS -->
@@ -364,7 +374,7 @@
                         </div>
                         <div>
                             <label class="block text-[11px] font-medium text-slate-600 mb-1">Base Size (pt)</label>
-                            <input type="number" id="font-size" value="11" min="6" max="24" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <input type="number" id="font-size" value="8" min="6" max="24" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                         </div>
                     </div>
 
@@ -418,7 +428,12 @@
                             Logarithmic Scale (log10)
                         </label>
                     </div>
-
+					
+					<label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
+						<input type="checkbox" id="box-figure" checked onchange="updateChart()" class="rounded text-blue-600">
+						Box the figure (top &amp; right axis lines)
+					</label>
+					
                     <div class="grid grid-cols-3 gap-2">
                         <div>
                             <label class="block text-[10px] text-slate-500">Y Min</label>
@@ -438,8 +453,8 @@
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-1">Y-Tick Direction</label>
                             <select id="tick-direction" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                                <option value="outer" selected>Outer (Standard)</option>
-                                <option value="inner">Inner</option>
+                                <option value="outer">Outer</option>
+                                <option value="inner" selected>Inner</option>
                                 <option value="both">Both Sides</option>
                             </select>
                         </div>
@@ -478,7 +493,7 @@
                     <h3 class="text-xs font-bold uppercase tracking-wider text-slate-600">X-Axis Scale & Ticks</h3>
                     
                     <label class="flex items-center gap-2 cursor-pointer text-xs font-medium text-slate-700">
-                        <input type="checkbox" id="x-ticks-show" checked onchange="updateChart()" class="rounded text-blue-600">
+                        <input type="checkbox" id="x-ticks-show" onchange="updateChart()" class="rounded text-blue-600">
                         Show X-Axis Category Ticks
                     </label>
 
@@ -486,7 +501,7 @@
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-1">X-Tick Direction</label>
                             <select id="x-tick-direction" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                                <option value="outer" selected>Outer (Standard)</option>
+                                <option value="outer" selected>Outer</option>
                                 <option value="inner">Inner</option>
                                 <option value="both">Both Sides</option>
                             </select>
@@ -695,6 +710,20 @@
 			}
 			return PALETTES[key] || PALETTES['okabe-ito'];
 		}
+		function getMonoBaseColor() {
+			const el = document.getElementById('mono-base-color');
+			return (el && el.value) || MONO_DEFAULT;
+		}
+
+		function resolveBarStyle(isSingleSeries, xIdx, gIdx) {
+			if (isMonoPalette()) {
+				return { color: getMonoBaseColor(), pattern: 'none' };
+			}
+			if (isSingleSeries) {
+				return categoryStyles[xIdx] || { color: '#3b82f6', pattern: 'none' };
+			}
+			return seriesStyles[gIdx] || { color: '#3b82f6', pattern: 'none' };
+		}
 
 function isMonoPalette() {
     return document.getElementById('color-palette').value === 'mono';
@@ -787,12 +816,19 @@ function isMonoPalette() {
             });
             el.addEventListener('keyup', () => { lastFocusedField = el; updateActiveToolbarState(); });
             el.addEventListener('mouseup', () => { lastFocusedField = el; updateActiveToolbarState(); });
-            el.addEventListener('paste', (e) => {
-                e.preventDefault();
-                const t = (e.clipboardData || window.clipboardData).getData('text/plain').replace(/\s*[\r\n]+\s*/g, ' ');
-                if (t) document.execCommand('insertText', false, t);
-                updateChart();
-            });
+			el.addEventListener('paste', (e) => {
+				const raw = (e.clipboardData || window.clipboardData).getData('text/plain') || '';
+
+				// Structured data (tabs or newlines): let the table-level handler
+				// in setupDataTable() take it. Returning without preventDefault
+				// lets the event bubble up so that handler can parse it into cells.
+				if (/[\t\n]/.test(raw)) return;
+
+				e.preventDefault();
+				const t = raw.replace(/\s*[\r\n]+\s*/g, ' ');
+				if (t) document.execCommand('insertText', false, t);
+				updateChart();
+			});
             el.addEventListener('drop', (e) => e.preventDefault());
         }
 
@@ -1066,7 +1102,7 @@ function isMonoPalette() {
         const ROLES = [
             ['x', 'Category'], 
             ['group', 'Subgroup'], 
-            ['mean', 'Mean'], 
+            ['mean', 'Bar Height'], 
             ['error', '± Error'], 
             ['plus', '+ Error'], 
             ['minus', '− Error'], 
@@ -1075,17 +1111,54 @@ function isMonoPalette() {
         ];
         const NUMERIC_ROLES = ['mean', 'error', 'plus', 'minus'];
 
-        function splitLine(line, delim) {
-            if (delim === '\t') return line.split('\t').map(c => c.trim());
-            const out = []; let cur = '', q = false;
-            for (const ch of line) {
-                if (ch === '"') q = !q;
-                else if (ch === ',' && !q) { out.push(cur.trim()); cur = ''; }
-                else cur += ch;
-            }
-            out.push(cur.trim());
-            return out;
-        }
+		function splitLine(line, delim) {
+			const out = []; let cur = '', q = false;
+			for (const ch of line) {
+				if (ch === '"') { q = !q; }
+				else if (ch === delim && !q) { out.push(cur.trim()); cur = ''; }
+				else cur += ch;
+			}
+			out.push(cur.trim());
+			return out;
+		}
+		
+		function detectDelimiter(text) {
+			const firstLine = text.split('\n')[0];
+			if (firstLine.includes('\t')) return '\t';
+			if (firstLine.includes(';') && !firstLine.includes(',')) return ';';
+			if (firstLine.includes('|')) return '|';
+			return ',';
+		}
+
+		function looksUndelimited(text) {
+			const lines = text.split('\n').filter(l => l.trim());
+			// Needs at least 3 lines to distinguish from a single value or a
+			// small 2-line paste that might legitimately be one column.
+			if (lines.length < 3) return false;
+			// Must contain no recognized delimiters at all.
+			if (text.includes('\t') || text.includes(';') || text.includes('|')) return false;
+			// And must have only one comma at most (a single stray comma is
+			// more likely part of a value than a real delimiter).
+			const commaCount = (text.match(/,/g) || []).length;
+			if (commaCount > 1) return false;
+			// And the lines should have 2+ space gaps between content, which is
+			// the tell-tale sign of fixed-width output.
+			const wideGapLines = lines.filter(l => /\S\s{2,}\S/.test(l)).length;
+			return wideGapLines >= Math.ceil(lines.length * 0.8);
+		}
+
+		let pasteHintTimer = null;
+		function showPasteHint() {
+			const hint = document.getElementById('data-hint');
+			if (!hint) return;
+			hint.textContent = 'Pasted text looks like fixed-width console output (e.g. from R or Stata). Export as CSV or TSV first, then paste.';
+			hint.classList.remove('hidden');
+			if (pasteHintTimer) clearTimeout(pasteHintTimer);
+			pasteHintTimer = setTimeout(() => {
+				hint.classList.add('hidden');
+				hint.textContent = '';
+			}, 10000);
+		}
 
         function headCellHtml(c, j) {
             const opts = ROLES.map(([v, l]) => `<option value="${v}"${c.role === v ? ' selected' : ''}>${l}</option>`).join('');
@@ -1192,8 +1265,8 @@ function isMonoPalette() {
             headers.forEach((h, j) => {
                 const t = String(h).replace(/<[^>]+>/g, '').toLowerCase();
                 if (numeric[j]) {
-                    if (/mean|average|avg|time/.test(t)) assign(j, 'mean');
-                    else if (/\b(sem|sd|se|ci|error|err|stdev|stderr)\b/.test(t)) assign(j, 'error');
+					if (/(mean|average|avg\.?)/i.test(t)) assign(j, 'mean');
+                    else if (/(sem|sd|se|std\.?\s*(dev|err)|stdev|stderr|\bse\b|\bci\b|\berr(or)?\b|\bdev(iation)?\b|95%\s*ci)/i.test(t)) assign(j, 'error');
                 } else {
                     if (/sig|signif|star|letter/.test(t)) assign(j, 'significance');
                     else if (/subgroup|group|treat|condition|series|legend|tool/.test(t)) assign(j, 'group');
@@ -1260,21 +1333,29 @@ function isMonoPalette() {
                 const next = wrap.querySelector(sel);
                 if (next) next.focus();
             });
-            wrap.addEventListener('paste', (e) => {
-                const t = e.target;
-                if (t.dataset.col === undefined) return;
-                const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\r/g, '');
-                if (!/[\t\n]/.test(text.trim())) return;
-                e.preventDefault();
-                const delim = text.includes('\t') ? '\t' : ',';
-                const grid = text.split('\n').filter(l => l.trim()).map(l => splitLine(l, delim).map(c => c.replace(/^"|"$/g, '')));
-                if (!grid.length) return;
-                const inHeader = t.dataset.row === 'h';
-                const r0 = inHeader ? 0 : parseInt(t.dataset.row);
-                const c0 = parseInt(t.dataset.col);
-                if (inHeader || (r0 === 0 && c0 === 0)) loadGrid(grid);
-                else fillGrid(grid, r0, c0);
-            });
+			wrap.addEventListener('paste', (e) => {
+				const t = e.target;
+				if (t.dataset.col === undefined) return;
+				const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\r/g, '');
+				if (!/[\t\n;|]/.test(text.trim())) return;
+				e.preventDefault();
+				const delim = detectDelimiter(text);
+				const grid = text.split('\n').filter(l => l.trim()).map(l => splitLine(l, delim).map(c => c.replace(/^"|"$/g, '')));
+				if (!grid.length) return;
+
+				// Single column, multiple rows: the paste had structure we didn't
+				// recognize as a delimiter. Almost always fixed-width console output.
+				// Let it through so the user sees the result, and warn them.
+				if (grid.length > 1 && grid[0].length === 1) {
+					setTimeout(showPasteHint, 0);
+				}
+
+				const inHeader = t.dataset.row === 'h';
+				const r0 = inHeader ? 0 : parseInt(t.dataset.row);
+				const c0 = parseInt(t.dataset.col);
+				if (inHeader || (r0 === 0 && c0 === 0)) loadGrid(grid);
+				else fillGrid(grid, r0, c0);
+			});
         }
 
         function syncTitles(force) {
@@ -1362,12 +1443,14 @@ function isMonoPalette() {
 			const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
 
 			if (mono) {
-				const base = colors[0];
+				// Ensure arrays exist with correct lengths so the customizer/legend
+				// don't crash, but DO NOT write colors into them — mono is a
+				// render-time override (see resolveBarStyle).
 				if (!Array.isArray(categoryStyles) || categoryStyles.length !== xCats.length) {
-					categoryStyles = xCats.map(() => ({ color: base, pattern: 'none' }));
+					categoryStyles = xCats.map(() => ({ color: MONO_DEFAULT, pattern: 'none' }));
 				}
 				if (!Array.isArray(seriesStyles) || seriesStyles.length !== subGroups.length) {
-					seriesStyles = subGroups.map(() => ({ color: base, pattern: 'none' }));
+					seriesStyles = subGroups.map(() => ({ color: MONO_DEFAULT, pattern: 'none' }));
 				}
 			} else if (subGroups.length === 1 && subGroups[0] === 'Default') {
 				if (!Array.isArray(categoryStyles) || categoryStyles.length !== xCats.length) {
@@ -1415,9 +1498,7 @@ function isMonoPalette() {
 			const xCats = Array.from(new Set(summaryStats.map(s => s.x)));
 
 			if (mono) {
-				const base = colors[0];
-				categoryStyles = xCats.map(() => ({ color: base, pattern: 'none' }));
-				seriesStyles = subGroups.map(() => ({ color: base, pattern: 'none' }));
+				// No-op: mono is a render-time override
 			} else if (subGroups.length === 1 && subGroups[0] === 'Default') {
 				categoryStyles = xCats.map((_, idx) => ({
 					color: colors[idx % colors.length],
@@ -1476,12 +1557,11 @@ function isMonoPalette() {
 				const base = paletteColors[0];
 				container.innerHTML = `
 					<div class="p-2.5 bg-slate-50 border border-slate-200 rounded-md space-y-2">
-						<div class="text-xs font-bold text-slate-700">Monochrome Fill</div>
+						<div class="text-xs font-bold text-slate-700">Single Color Fill</div>
 						<p class="text-[10px] text-slate-500">All bars share a single color. Change the base color above.</p>
 						<div class="flex items-center gap-2">
 						<input type="color" value="${base}"
-							oninput="document.getElementById('mono-base-color').value = this.value; updateChart();"
-							onchange="document.getElementById('mono-base-color').value = this.value; applyColorPalette();"
+							oninput="document.getElementById('mono-base-color').value = this.value; updateChart(); updatePalettePreview();"
 							class="w-full h-8 p-0 border border-slate-300 rounded cursor-pointer">
 						</div>
 					</div>
@@ -1557,20 +1637,31 @@ function isMonoPalette() {
             updateChart();
         }
 
-        function onLogScaleToggle() {
-            const isLog = document.getElementById('y-log-scale').checked;
-            const yMinInput = document.getElementById('y-min');
-            const subDivWrap = document.getElementById('linear-subdivisions-wrapper');
-            if (isLog) {
-                if (yMinInput.value === '' || parseFloat(yMinInput.value) <= 0) {
-                    yMinInput.value = '1';
-                }
-                if (subDivWrap) subDivWrap.style.display = 'none';
-            } else {
-                if (subDivWrap) subDivWrap.style.display = 'block';
-            }
-            updateChart();
-        }
+		let preLogYMin = null;   // remembers y-min before log was enabled
+
+		function onLogScaleToggle() {
+			const isLog = document.getElementById('y-log-scale').checked;
+			const yMinInput = document.getElementById('y-min');
+			const subDivWrap = document.getElementById('linear-subdivisions-wrapper');
+
+			if (isLog) {
+				// Save the user's linear y-min (only once per log session).
+				if (preLogYMin === null) preLogYMin = yMinInput.value;
+				// Log scale can't have y-min <= 0. Only force 1 if needed.
+				if (yMinInput.value === '' || parseFloat(yMinInput.value) <= 0) {
+					yMinInput.value = '1';
+				}
+				if (subDivWrap) subDivWrap.style.display = 'none';
+			} else {
+				// Restore the saved linear y-min, then clear the stash.
+				if (preLogYMin !== null) {
+					yMinInput.value = preLogYMin;
+					preLogYMin = null;
+				}
+				if (subDivWrap) subDivWrap.style.display = 'block';
+			}
+			updateChart();
+		}
 
         function updateChart() {
             ensureSeriesStyles();
@@ -1601,8 +1692,9 @@ function isMonoPalette() {
 
             const font = document.getElementById('font-family').value;
             const baseFontSize = parseInt(document.getElementById('font-size').value) || 11;
-            const capWidth = parseInt(document.getElementById('cap-width').value) || 8;
-            
+			const capWidthRaw = parseInt(document.getElementById('cap-width').value);
+			const capWidth = isNaN(capWidthRaw) ? 8 : capWidthRaw;   
+			
             const strokeWidth = parseFloat(document.getElementById('universal-stroke-width').value) || 1.2;
             const barStrokeColor = '#000000';
             const groupPadding = parseFloat(document.getElementById('group-padding').value) || 0.25;
@@ -1678,12 +1770,16 @@ function isMonoPalette() {
             } else {
                 const niceAuto = calculateNiceTicks(yMin, yMax, 5);
                 effectiveStep = niceAuto.step;
-                if (!isNaN(userYStep) && userYStep > 0) {
-                    effectiveStep = userYStep;
-                    for (let t = yMin; t <= yMax + 0.0001; t += userYStep) ticks.push(parseFloat(t.toFixed(4)));
-                } else {
-                    ticks = niceAuto.ticks;
-                }
+			if (!isNaN(userYStep) && userYStep > 0) {
+				effectiveStep = userYStep;
+				// Anchor ticks to multiples of the step, not to yMin.
+				const firstTick = Math.ceil(yMin / userYStep) * userYStep;
+				for (let t = firstTick; t <= yMax + 1e-9; t += userYStep) {
+					ticks.push(parseFloat(t.toFixed(6)));
+				}
+			} else {
+				ticks = niceAuto.ticks;
+			}
             }
 
             userYStepInput.placeholder = `${effectiveStep}`;
@@ -1696,6 +1792,8 @@ function isMonoPalette() {
             const showXTicks = document.getElementById('x-ticks-show').checked;
             const xTickDir = document.getElementById('x-tick-direction').value;
             const xMajorTickLen = parseFloat(document.getElementById('x-tick-length').value) || 4;
+			const showBox = document.getElementById('box-figure').checked;
+
 
             const showMinorTicks = document.getElementById('minor-ticks-show').checked;
             const minorSubdiv = parseInt(document.getElementById('minor-tick-count').value) + 1;
@@ -1750,6 +1848,9 @@ function isMonoPalette() {
                     <pattern id="pattern-dots" width="8" height="8" patternUnits="userSpaceOnUse">
                         <circle cx="4" cy="4" r="1.2" fill="${barStrokeColor}" />
                     </pattern>
+					<clipPath id="plot-clip">
+						<rect x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}"/>
+					</clipPath>
                 </defs>
                 <style>.chart-text { font-family: ${font}; }</style>
                 <rect width="100%" height="100%" fill="#ffffff"/>
@@ -1804,21 +1905,22 @@ function isMonoPalette() {
             });
             svgContent += `</g>`;
 
-            refLines.forEach(rl => {
-                const yPos = yScale(rl.yVal);
-                if (yPos >= margin.top && yPos <= margin.top + plotHeight) {
-                    let dashArray = '';
-                    if (rl.strokeDash === 'dashed') dashArray = 'stroke-dasharray="6,4"';
-                    else if (rl.strokeDash === 'dotted') dashArray = 'stroke-dasharray="2,3"';
+			const renderRefLine = (rl) => {
+				const yPos = yScale(rl.yVal);
+				if (yPos < margin.top || yPos > margin.top + plotHeight) return '';
+				let dashArray = '';
+				if (rl.strokeDash === 'dashed') dashArray = 'stroke-dasharray="6,4"';
+				else if (rl.strokeDash === 'dotted') dashArray = 'stroke-dasharray="2,3"';
+				return `
+					<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'ref-lines-list')">
+						<line x1="${margin.left}" y1="${yPos}" x2="${margin.left + plotWidth}" y2="${yPos}" stroke="${rl.color}" stroke-width="${strokeWidth}" ${dashArray}/>
+						${rl.label ? `<text x="${margin.left + plotWidth - 4}" y="${yPos - 4}" font-size="${baseFontSize - 2}" text-anchor="end" fill="${rl.color}" class="chart-text">${esc(rl.label)}</text>` : ''}
+					</g>
+				`;
+			};
 
-                    svgContent += `
-                        <g class="clickable-chart-element">
-                            <line x1="${margin.left}" y1="${yPos}" x2="${margin.left + plotWidth}" y2="${yPos}" stroke="${rl.color}" stroke-width="${rl.strokeWidth}" ${dashArray}/>
-                            ${rl.label ? `<text x="${margin.left + plotWidth - 4}" y="${yPos - 4}" font-size="${baseFontSize - 2}" text-anchor="end" fill="${rl.color}" class="chart-text">${esc(rl.label)}</text>` : ''}
-                        </g>
-                    `;
-                }
-            });
+			// Ref lines flagged "behind" (default) — drawn under the bars.
+			refLines.filter(rl => !rl.onTop).forEach(rl => { svgContent += renderRefLine(rl); });
 
             const yTitleOffset = margin.left - (maxTickLabelWidth * (baseFontSize * 0.55) + 12);
             const yTitlePos = axisTitlePos.y || { x: Math.round(Math.max(12, yTitleOffset)), y: Math.round(margin.top + plotHeight / 2) };
@@ -1833,6 +1935,16 @@ function isMonoPalette() {
                     <text transform="translate(${yTitlePos.x}, ${yTitlePos.y}) rotate(-90)" x="0" y="0" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(yTitleRaw, baseFontSize + 1, font)}</text>
                 </g>
             `;
+			
+			if (showBox) {
+					svgContent += `
+						<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">
+							<line x1="${margin.left + plotWidth}" y1="${margin.top}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
+							<line x1="${margin.left}" y1="${margin.top}" x2="${margin.left + plotWidth}" y2="${margin.top}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
+						</g>
+					`;
+				}
+				
             if (xTitleRaw.trim()) {
                 svgContent += `
                     <g class="draggable-element axis-title-item clickable-chart-element" data-axis="x" onclick="navigateAndHighlight('annotations', 'x-title-wrapper')">
@@ -1872,10 +1984,12 @@ function isMonoPalette() {
                     const barY = yScale(stat.mean);
                     const barH = (margin.top + plotHeight) - barY;
                     
-                    const isSingleSeries = subGroups.length === 1 && subGroups[0] === 'Default';
-                    const style = isSingleSeries ? (categoryStyles[xIdx] || { color: '#3b82f6', pattern: 'none' }) : (seriesStyles[gIdx] || { color: '#3b82f6', pattern: 'none' });
+					const isSingleSeries = subGroups.length === 1 && subGroups[0] === 'Default';
+					const style = resolveBarStyle(isSingleSeries, xIdx, gIdx);
+                    
+					svgContent += `<g clip-path="url(#plot-clip)">`;                      // ← NEW
 
-                    svgContent += `
+					svgContent += `
                         <g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'series-customizer')">
                             <rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
                     `;
@@ -1884,32 +1998,46 @@ function isMonoPalette() {
                     }
                     svgContent += `</g>`;
 
-                    let topErrorY = barY;
-                    if (stat.errPlus > 0 || stat.errMinus > 0) {
-                        const topY = yScale(stat.mean + stat.errPlus);
-                        topErrorY = Math.min(barY, topY);
-                        const bottomY = yScale(Math.max(yMin, stat.mean - stat.errMinus));
-                        const midX = barX + subBarWidth / 2;
+					let topErrorY = barY;
+					if (stat.errPlus > 0 || stat.errMinus > 0) {
+						const topY = yScale(stat.mean + stat.errPlus);
+						topErrorY = Math.min(barY, topY);
+						const bottomY = yScale(Math.max(yMin, stat.mean - stat.errMinus));
+						const midX = barX + subBarWidth / 2;
 
-                        svgContent += `
-                            <g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'tab-style')">
-                                <line x1="${midX}" y1="${topY}" x2="${midX}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
-                                <line x1="${midX - capWidth / 2}" y1="${topY}" x2="${midX + capWidth / 2}" y2="${topY}" stroke="#000000" stroke-width="${strokeWidth}"/>
-                                <line x1="${midX - capWidth / 2}" y1="${bottomY}" x2="${midX + capWidth / 2}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
-                            </g>
-                        `;
-                    }
+						// Cap length: 0 means "no caps" (bare whisker). Otherwise enforce a
+						// minimum so the cap is always wider than it is thick.
+						const effectiveCapWidth = capWidth > 0 ? Math.max(capWidth, strokeWidth * 2) : 0;
 
-                    if (stat.significance && stat.significance.trim()) {
-                        const sigMidX = barX + subBarWidth / 2;
-                        const sigY = topErrorY - 6;
-                        svgContent += `
-                            <text x="${sigMidX}" y="${sigY}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" font-weight="bold" class="chart-text">${parseHTMLToSVG(stat.significance.trim(), baseFontSize, font)}</text>
-                        `;
-                    }
+						svgContent += `
+							<g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'error-bars-wrapper')">
+								<line x1="${midX}" y1="${topY}" x2="${midX}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+						`;
+						if (effectiveCapWidth > 0) {
+							svgContent += `
+								<line x1="${midX - effectiveCapWidth / 2}" y1="${topY}" x2="${midX + effectiveCapWidth / 2}" y2="${topY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+								<line x1="${midX - effectiveCapWidth / 2}" y1="${bottomY}" x2="${midX + effectiveCapWidth / 2}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+							`;
+						}
+						svgContent += `</g>`;
+					}
+					svgContent += `</g>`;                                                  // ← NEW
+
+					if (stat.significance && stat.significance.trim()) {
+						const sigMidX = barX + subBarWidth / 2;
+						const sigY = topErrorY - 6;
+						svgContent += `
+							<g class="clickable-chart-element" onclick="navigateAndHighlight('data', 'data-table-wrap')">
+								<text x="${sigMidX}" y="${sigY}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" font-weight="bold" class="chart-text">${parseHTMLToSVG(stat.significance.trim(), baseFontSize, font)}</text>
+							</g>
+						`;
+					}
                 });
             });
-
+			
+			// Ref lines flagged "on top" — drawn over the bars but under the legend/annotations.
+			refLines.filter(rl => rl.onTop).forEach(rl => { svgContent += renderRefLine(rl); });
+			
             if (legendVisible) {
                 const swatchSize = baseFontSize;
                 const rowHeight = swatchSize + legendItemGap;
@@ -1925,7 +2053,11 @@ function isMonoPalette() {
                     currentY += legendTitleGap;
                 }
                 subGroups.forEach((subG, idx) => {
-                    const style = seriesStyles[idx] || { color: '#3b82f6', pattern: 'none' };
+					// Legend swatches: in mono mode there's only one swatch, and it must
+					// reflect the live base color; otherwise use the series style.
+					const style = isMonoPalette()
+						? { color: getMonoBaseColor(), pattern: 'none' }
+						: (seriesStyles[idx] || { color: '#3b82f6', pattern: 'none' });
                     const swatchY = currentY - swatchSize + 2;
                     svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
                     if (style.pattern && style.pattern !== 'none') {
@@ -1984,13 +2116,20 @@ function isMonoPalette() {
                 if (axisTitlePos[ax]) axisTitlePos[ax] = { x: Math.round(renderedTitlePos[ax].x), y: Math.round(renderedTitlePos[ax].y) };
             });
         }
+		function defaultRefLineY() {
+			const means = summaryStats.map(s => s.mean).filter(v => isFinite(v));
+			if (!means.length) return 0;
+			const lo = Math.min(...means);
+			const hi = Math.max(...means);
+			return Math.round(((lo + hi) / 2) * 100) / 100;
+		}
 
-        function addRefLine() {
-            const newId = refLines.length > 0 ? Math.max(...refLines.map(r => r.id)) + 1 : 1;
-            refLines.push({ id: newId, yVal: 20, strokeDash: 'dashed', strokeWidth: 1, color: '#94a3b8', label: '' });
-            renderRefLinesList();
-            updateChart();
-        }
+
+		function addRefLine() {
+			const newId = refLines.length > 0 ? Math.max(...refLines.map(r => r.id)) + 1 : 1;
+refLines.push({ id: newId, yVal: defaultRefLineY(), strokeDash: 'dashed', color: '#64748b', label: '', onTop: false });			renderRefLinesList();
+			updateChart();
+		}
 
         function removeRefLine(id) {
             refLines = refLines.filter(r => r.id !== id);
@@ -2012,24 +2151,32 @@ function isMonoPalette() {
                             <span>Reference Line #${idx + 1}</span>
                             <button onclick="removeRefLine(${rl.id})" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-trash"></i></button>
                         </div>
-                        <div class="grid grid-cols-3 gap-2">
-                            <div>
-                                <label class="block text-[10px] text-slate-500">Y Value</label>
-                                <input type="number" step="any" value="${rl.yVal}" onchange="refLines.find(r => r.id === ${rl.id}).yVal = parseFloat(this.value); updateChart();" class="w-full text-xs p-1 border rounded">
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-500">Style</label>
-                                <select onchange="refLines.find(r => r.id === ${rl.id}).strokeDash = this.value; updateChart();" class="w-full text-xs p-1 border rounded">
-                                    <option value="solid" ${rl.strokeDash === 'solid' ? 'selected' : ''}>Solid</option>
-                                    <option value="dashed" ${rl.strokeDash === 'dashed' ? 'selected' : ''}>Dashed</option>
-                                    <option value="dotted" ${rl.strokeDash === 'dotted' ? 'selected' : ''}>Dotted</option>
-                                </select>
-                            </div>
-                            <div>
-                                <label class="block text-[10px] text-slate-500">Color</label>
-                                <input type="color" value="${rl.color}" onchange="refLines.find(r => r.id === ${rl.id}).color = this.value; updateChart();" class="w-full h-7 p-0 border rounded cursor-pointer">
-                            </div>
-                        </div>
+						<div class="grid grid-cols-3 gap-2">
+							<div>
+								<label class="block text-[10px] text-slate-500">Y Value</label>
+								<input type="number" step="any" value="${rl.yVal}" oninput="refLines.find(r => r.id === ${rl.id}).yVal = parseFloat(this.value); updateChart();" class="w-full text-xs p-1 border rounded">
+							</div>
+							<div>
+								<label class="block text-[10px] text-slate-500">Style</label>
+								<select onchange="refLines.find(r => r.id === ${rl.id}).strokeDash = this.value; updateChart();" class="w-full text-xs p-1 border rounded">
+									<option value="solid" ${rl.strokeDash === 'solid' ? 'selected' : ''}>Solid</option>
+									<option value="dashed" ${rl.strokeDash === 'dashed' ? 'selected' : ''}>Dashed</option>
+									<option value="dotted" ${rl.strokeDash === 'dotted' ? 'selected' : ''}>Dotted</option>
+								</select>
+							</div>
+							<div>
+								<label class="block text-[10px] text-slate-500">Color</label>
+								<input type="color" value="${rl.color}" oninput="refLines.find(r => r.id === ${rl.id}).color = this.value; updateChart();" class="w-full h-7 p-0 border rounded cursor-pointer">
+							</div>
+							<div class="flex items-center gap-2 pt-1">
+								<label class="flex items-center gap-1.5 cursor-pointer text-[11px] text-slate-600">
+									<input type="checkbox" ${rl.onTop ? 'checked' : ''}
+										   onchange="refLines.find(r => r.id === ${rl.id}).onTop = this.checked; updateChart();"
+										   class="rounded text-blue-600">
+									Draw in front of bars
+								</label>
+							</div>
+						</div>
                     </div>
                 `;
             });
