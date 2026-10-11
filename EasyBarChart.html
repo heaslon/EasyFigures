@@ -170,6 +170,16 @@
 			border: none;
 			border-radius: 3px;
 		}
+		
+		
+		input[type="number"][data-auto="1"] {
+			color: #64748b;
+			font-style: italic;
+		}
+		input[type="number"][data-auto="1"]:focus {
+			color: #0f172a;
+			font-style: normal;
+		}
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800 min-h-screen flex flex-col">
@@ -434,20 +444,43 @@
 						Box the figure (top &amp; right axis lines)
 					</label>
 					
-                    <div class="grid grid-cols-3 gap-2">
-                        <div>
-                            <label class="block text-[10px] text-slate-500">Y Min</label>
-                            <input type="number" id="y-min" placeholder="Auto" step="any" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-500">Y Max</label>
-                            <input type="number" id="y-max" placeholder="Auto" step="any" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                        </div>
-                        <div>
-                            <label class="block text-[10px] text-slate-500">Tick Step</label>
-                            <input type="number" id="y-step" placeholder="Auto" step="any" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
-                        </div>
-                    </div>
+					<div class="grid grid-cols-3 gap-2">
+						<div>
+							<label class="block text-[10px] text-slate-500">Y Min</label>
+							<div class="flex gap-1">
+								<input type="number" id="y-min" data-auto="1" placeholder="Auto" step="any"
+									   onchange="updateChart()"
+									   class="w-full text-xs p-1.5 border border-slate-300 rounded">
+								<button type="button" data-reset="y-min"
+										class="text-[11px] px-1.5 text-slate-400 hover:text-blue-600 border border-slate-300 rounded leading-none"
+										title="Reset to auto">&crarr;</button>
+							</div>
+						</div>
+						<div>
+							<label class="block text-[10px] text-slate-500">Y Max</label>
+							<div class="flex gap-1">
+								<input type="number" id="y-max" data-auto="1" placeholder="Auto" step="any"
+									   onchange="updateChart()"
+									   class="w-full text-xs p-1.5 border border-slate-300 rounded">
+								<button type="button" data-reset="y-max"
+										class="text-[11px] px-1.5 text-slate-400 hover:text-blue-600 border border-slate-300 rounded leading-none"
+										title="Reset to auto">&crarr;</button>
+							</div>
+						</div>
+						<div>
+							<label class="block text-[10px] text-slate-500">Tick Step</label>
+							<div class="flex gap-1">
+								<input type="number" id="y-step" data-auto="1" placeholder="Auto" step="any"
+									   onchange="updateChart()"
+									   class="w-full text-xs p-1.5 border border-slate-300 rounded">
+								<button type="button" data-reset="y-step"
+										class="text-[11px] px-1.5 text-slate-400 hover:text-blue-600 border border-slate-300 rounded leading-none"
+										title="Reset to auto">&crarr;</button>
+							</div>
+						</div>
+					</div>
+
+					<p id="y-range-error" class="text-[11px] text-red-600 font-medium hidden"></p>
 
                     <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
                         <div>
@@ -746,6 +779,7 @@ function isMonoPalette() {
         window.onload = function() {
             initRichFields();
             setupDataTable();
+		    setupAutoFields();          
             loadSampleData();
             setupDragAndDrop();
             setupSciPicker();
@@ -968,6 +1002,33 @@ function isMonoPalette() {
             document.getElementById('sci-picker-body').innerHTML = html;
         }
 
+		const AUTO_FIELD_IDS = ['y-min', 'y-max', 'y-step'];
+
+		function setupAutoFields() {
+			AUTO_FIELD_IDS.forEach(id => {
+				const el = document.getElementById(id);
+				if (!el) return;
+
+				// Any typing, pasting, or spinner click means "user wants control."
+				// 'input' fires for all three. We do NOT use 'change' here because
+				// 'change' only fires on blur, which is too late — updateChart()
+				// would still be treating the field as auto in the meantime.
+				el.addEventListener('input', () => {
+					el.dataset.auto = '0';
+				});
+
+				// Reset button: re-arm auto, clear the field, re-render.
+				const resetBtn = document.querySelector(`[data-reset="${id}"]`);
+				if (resetBtn) {
+					resetBtn.addEventListener('click', () => {
+						el.dataset.auto = '1';
+						el.value = '';           // cleared; updateChart() will refill with auto
+						updateChart();
+					});
+				}
+			});
+		}
+
         function setupSciPicker() {
             buildSciPicker();
             const pop = document.getElementById('sci-picker');
@@ -1079,7 +1140,10 @@ function isMonoPalette() {
             }, 60);
         }
 
-        function loadSampleData() {
+        function loadSampleData(force = false) {
+            if (!force && dataRows.some(r => !rowIsBlank(r))) {
+                if (!confirm('Replace the current data with the sample dataset? This cannot be undone.')) return;
+            }
             columns = SAMPLE_COLS.map(c => ({ ...c }));
             dataRows = SAMPLE_ROWS.map(r => r.slice());
             isLegendManuallyMoved = false;
@@ -1089,6 +1153,9 @@ function isMonoPalette() {
         }
 
         function clearData() {
+            if (dataRows.some(r => !rowIsBlank(r))) {
+                if (!confirm('Clear all data rows? This cannot be undone.')) return;
+            }
             dataRows = [];
             lastGroupKey = null;
             renderDataTable();
@@ -1224,10 +1291,13 @@ function isMonoPalette() {
         }
 
         function deleteRow(i) {
+            const hasData = dataRows[i] && dataRows[i].some(c => String(c).trim());
+            if (hasData && !confirm(`Delete row ${i + 1} and its data?`)) return;
             dataRows.splice(i, 1);
             renderDataTable();
             applyTable();
         }
+
 
         function addColumn() {
             columns.push({ header: '', role: 'ignore' });
@@ -1236,8 +1306,13 @@ function isMonoPalette() {
             applyTable();
         }
 
+
         function deleteColumn(j) {
             if (columns.length <= 1) return;
+            const col = columns[j];
+            const hasData = dataRows.some(r => String(r[j] ?? '').trim());
+            const label = col.header.replace(/<[^>]+>/g, '').trim() || `Col ${j + 1}`;
+            if (hasData && !confirm(`Delete column "${label}" and all its data?`)) return;
             columns.splice(j, 1);
             dataRows.forEach(r => r.splice(j, 1));
             renderDataTable();
@@ -1370,6 +1445,30 @@ function isMonoPalette() {
                 if (elX) elX.value = '';
             }
         }
+		
+		function setRangeWarning(msg) {
+			const el = document.getElementById('data-hint');
+			if (!el) return;
+			if (!msg) {
+				el.classList.add('hidden');
+				el.textContent = '';
+				return;
+			}
+			el.textContent = msg;
+			el.classList.remove('hidden');
+		}
+
+		function setYRangeError(msg) {
+			const el = document.getElementById('y-range-error');
+			if (!el) return;
+			if (!msg) {
+				el.classList.add('hidden');
+				el.textContent = '';
+				return;
+			}
+			el.textContent = msg;
+			el.classList.remove('hidden');
+		}
 
         function applyTable(forceTitles = false) {
             const col = (role) => columns.findIndex(c => c.role === role);
@@ -1663,247 +1762,313 @@ function isMonoPalette() {
 			updateChart();
 		}
 
-        function updateChart() {
-            ensureSeriesStyles();
+		function updateChart() {
+			ensureSeriesStyles();
 
-            const svg = document.getElementById('chart-svg');
-            const widthMm = parseFloat(document.getElementById('svg-width-mm').value) || 90;
-            const heightMm = parseFloat(document.getElementById('svg-height-mm').value) || 65;
+			const svg = document.getElementById('chart-svg');
+			const widthMm = parseFloat(document.getElementById('svg-width-mm').value) || 90;
+			const heightMm = parseFloat(document.getElementById('svg-height-mm').value) || 65;
 
-            const svgWidth = Math.round(widthMm * MM_TO_PX);
-            const svgHeight = Math.round(heightMm * MM_TO_PX);
+			const svgWidth = Math.round(widthMm * MM_TO_PX);
+			const svgHeight = Math.round(heightMm * MM_TO_PX);
 
-            document.getElementById('canvas-dim-indicator').innerText = `(${widthMm} x ${heightMm} mm)`;
+			document.getElementById('canvas-dim-indicator').innerText = `(${widthMm} x ${heightMm} mm)`;
 
-            svg.setAttribute('width', svgWidth);
-            svg.setAttribute('height', svgHeight);
-            svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
-            applyZoom(svgWidth, svgHeight);
+			svg.setAttribute('width', svgWidth);
+			svg.setAttribute('height', svgHeight);
+			svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
+			applyZoom(svgWidth, svgHeight);
 
-            let margin = {
-                top: Math.round((parseFloat(document.getElementById('margin-top-mm').value) || 10) * MM_TO_PX),
-                bottom: Math.round((parseFloat(document.getElementById('margin-bottom-mm').value) || 10) * MM_TO_PX),
-                left: Math.round((parseFloat(document.getElementById('margin-left-mm').value) || 15) * MM_TO_PX),
-                right: Math.round((parseFloat(document.getElementById('margin-right-mm').value) || 6) * MM_TO_PX)
-            };
+			let margin = {
+				top: Math.round((parseFloat(document.getElementById('margin-top-mm').value) || 10) * MM_TO_PX),
+				bottom: Math.round((parseFloat(document.getElementById('margin-bottom-mm').value) || 10) * MM_TO_PX),
+				left: Math.round((parseFloat(document.getElementById('margin-left-mm').value) || 15) * MM_TO_PX),
+				right: Math.round((parseFloat(document.getElementById('margin-right-mm').value) || 6) * MM_TO_PX)
+			};
 
-            const plotWidth = Math.max(50, svgWidth - margin.left - margin.right);
-            const plotHeight = Math.max(50, svgHeight - margin.top - margin.bottom);
+			const plotWidth = Math.max(50, svgWidth - margin.left - margin.right);
+			const plotHeight = Math.max(50, svgHeight - margin.top - margin.bottom);
 
-            const font = document.getElementById('font-family').value;
-            const baseFontSize = parseInt(document.getElementById('font-size').value) || 11;
+			const font = document.getElementById('font-family').value;
+			const baseFontSize = parseInt(document.getElementById('font-size').value) || 11;
 			const capWidthRaw = parseInt(document.getElementById('cap-width').value);
-			const capWidth = isNaN(capWidthRaw) ? 8 : capWidthRaw;   
+			const capWidth = isNaN(capWidthRaw) ? 8 : capWidthRaw;
+
+			const strokeWidth = parseFloat(document.getElementById('universal-stroke-width').value) || 1.2;
+			const barStrokeColor = '#000000';
+			const groupPadding = parseFloat(document.getElementById('group-padding').value) || 0.25;
+			const innerGap = parseInt(document.getElementById('bar-gap').value) || 2;
+
+			const legendItemGap = parseInt(document.getElementById('legend-item-gap').value) || 5;
+			const legendTitleGap = parseInt(document.getElementById('legend-title-gap').value) || 14;
+
+			const yTitleRaw = document.getElementById('y-title').value;
+			const xTitleRaw = document.getElementById('x-title').value;
+
+			const showLegend = document.getElementById('legend-show').checked;
+			const showLegendBox = document.getElementById('legend-box').checked;
+			const legendTitle = document.getElementById('legend-title').value;
+
+			const isLogScale = document.getElementById('y-log-scale').checked;
+
+			const xCategories = Array.from(new Set(summaryStats.map(s => s.x)));
+			const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
+
+			// ← PATCH: seed both ends with 0 so zero is always inside the auto range.
+			// If all data is positive, rawMinVal stays 0. If all negative, rawMaxVal stays 0.
+			let rawMaxVal = 0, rawMinVal = 0;
+			summaryStats.forEach(s => {
+				const top    = s.mean + s.errPlus;
+				const bottom = s.mean - s.errMinus;
+				if (top    > rawMaxVal) rawMaxVal = top;
+				if (bottom < rawMinVal) rawMinVal = bottom;
+			});
+			// Guard against an empty dataset producing a zero-width range.
+			if (rawMaxVal === 0 && rawMinVal === 0) rawMaxVal = 10;
+
+			const userYMinInput = document.getElementById('y-min');
+			const userYMaxInput = document.getElementById('y-max');
+			const userYStepInput = document.getElementById('y-step');
+
+			// A field is "pinned" only when the user has actually edited it. The
+			// data-auto flag is set in setupAutoFields() and flipped the moment the
+			// user types or spins. We capture it BEFORE writing the auto value back,
+			// because the write doesn't change the flag but does change the value.
+			const yMinIsAuto  = userYMinInput.dataset.auto  !== '0';
+			const yMaxIsAuto  = userYMaxInput.dataset.auto  !== '0';
+			const yStepIsAuto = userYStepInput.dataset.auto !== '0';
+
+			const userYMin  = yMinIsAuto  ? NaN : parseFloat(userYMinInput.value);
+			const userYMax  = yMaxIsAuto  ? NaN : parseFloat(userYMaxInput.value);
+			const userYStep = yStepIsAuto ? NaN : parseFloat(userYStepInput.value);
+			const rangeWarnings = [];
 			
-            const strokeWidth = parseFloat(document.getElementById('universal-stroke-width').value) || 1.2;
-            const barStrokeColor = '#000000';
-            const groupPadding = parseFloat(document.getElementById('group-padding').value) || 0.25;
-            const innerGap = parseInt(document.getElementById('bar-gap').value) || 2;
+			let calculatedMin = isLogScale ? 1 : rawMinVal;
+			let calculatedMax = rawMaxVal === 0 ? 10 : rawMaxVal;
 
-            const legendItemGap = parseInt(document.getElementById('legend-item-gap').value) || 5;
-            const legendTitleGap = parseInt(document.getElementById('legend-title-gap').value) || 14;
+			if (isLogScale) {
+				const hasNonPositive = summaryStats.some(s => (s.mean - s.errMinus) <= 0 || s.mean <= 0);
+				if (hasNonPositive) {
+					rangeWarnings.push(
+						'Log scale cannot display zero or negative values. Switch to linear or remove those rows.'
+					);
+				}
+				const posMin = rawMinVal > 0 ? rawMinVal : 1;
+				const posMax = rawMaxVal > 0 ? rawMaxVal : 10;
+				calculatedMin = Math.pow(10, Math.floor(Math.log10(posMin)));
+				calculatedMax = Math.pow(10, Math.ceil(Math.log10(posMax)));
+				if (calculatedMin === calculatedMax) calculatedMax = calculatedMin * 10;
 
-            const yTitleRaw = document.getElementById('y-title').value;
-            const xTitleRaw = document.getElementById('x-title').value;
-
-            const showLegend = document.getElementById('legend-show').checked;
-            const showLegendBox = document.getElementById('legend-box').checked;
-            const legendTitle = document.getElementById('legend-title').value;
-
-            const isLogScale = document.getElementById('y-log-scale').checked;
-
-            const xCategories = Array.from(new Set(summaryStats.map(s => s.x)));
-            const subGroups = Array.from(new Set(summaryStats.map(s => s.group)));
-
-            let rawMaxVal = 0, rawMinVal = Infinity;
-            summaryStats.forEach(s => {
-                const top = s.mean + s.errPlus;
-                const bottom = Math.max(0.0001, s.mean - s.errMinus);
-                if (top > rawMaxVal) rawMaxVal = top;
-                if (bottom < rawMinVal) rawMinVal = bottom;
-            });
-            if (rawMinVal === Infinity) rawMinVal = 1;
-
-            const userYMinInput = document.getElementById('y-min');
-            const userYMaxInput = document.getElementById('y-max');
-            const userYStepInput = document.getElementById('y-step');
-
-            const userYMin = parseFloat(userYMinInput.value);
-            const userYMax = parseFloat(userYMaxInput.value);
-            const userYStep = parseFloat(userYStepInput.value);
-
-            let calculatedMin = isLogScale ? 1 : 0;
-            let calculatedMax = rawMaxVal === 0 ? 10 : rawMaxVal;
-
-            if (isLogScale) {
-                calculatedMin = rawMinVal > 0 ? Math.pow(10, Math.floor(Math.log10(rawMinVal))) : 1;
-                calculatedMax = Math.pow(10, Math.ceil(Math.log10(rawMaxVal === 0 ? 10 : rawMaxVal)));
-                if (calculatedMin === calculatedMax) calculatedMax = calculatedMin * 10;
-            } else {
-                const niceAuto = calculateNiceTicks(calculatedMin, calculatedMax, 5);
-                calculatedMax = niceAuto.max;
-            }
-
-            const yMin = !isNaN(userYMin) ? userYMin : calculatedMin;
-            const yMax = !isNaN(userYMax) ? userYMax : calculatedMax;
-
-            userYMinInput.placeholder = `${calculatedMin}`;
-            userYMaxInput.placeholder = `${calculatedMax}`;
-            if (userYMinInput.value === '' || (isLogScale && parseFloat(userYMinInput.value) <= 0)) {
-                userYMinInput.value = calculatedMin;
-            }
-            if (userYMaxInput.value === '') userYMaxInput.value = calculatedMax;
-
-            let ticks = [];
-            let effectiveStep = 1;
-
-            if (isLogScale) {
-                const minExp = Math.floor(Math.log10(Math.max(1e-10, yMin)));
-                const maxExp = Math.ceil(Math.log10(Math.max(1e-10, yMax)));
-                for (let exp = minExp; exp <= maxExp; exp++) {
-                    const val = Math.pow(10, exp);
-                    if (val >= yMin * 0.99 && val <= yMax * 1.01) ticks.push(val);
-                }
-                if (ticks.length < 2) {
-                    ticks = [Math.pow(10, minExp), Math.pow(10, maxExp + 1)];
-                }
-            } else {
-                const niceAuto = calculateNiceTicks(yMin, yMax, 5);
-                effectiveStep = niceAuto.step;
-			if (!isNaN(userYStep) && userYStep > 0) {
-				effectiveStep = userYStep;
-				// Anchor ticks to multiples of the step, not to yMin.
-				const firstTick = Math.ceil(yMin / userYStep) * userYStep;
-				for (let t = firstTick; t <= yMax + 1e-9; t += userYStep) {
-					ticks.push(parseFloat(t.toFixed(6)));
+				if (!yMinIsAuto && userYMin <= 0) {
+					rangeWarnings.push(`Log scale requires a positive y-min; the pinned value (${userYMin}) is not.`);
+				}
+				if (!yMaxIsAuto && userYMax <= 0) {
+					rangeWarnings.push(`Log scale requires a positive y-max; the pinned value (${userYMax}) is not.`);
 				}
 			} else {
-				ticks = niceAuto.ticks;
+				const niceAuto = calculateNiceTicks(calculatedMin, calculatedMax, 5);
+				calculatedMin = niceAuto.min;
+				calculatedMax = niceAuto.max;
 			}
-            }
 
-            userYStepInput.placeholder = `${effectiveStep}`;
-            if (userYStepInput.value === '') userYStepInput.value = effectiveStep;
+			const yMin = !isNaN(userYMin) ? userYMin : calculatedMin;
+			const yMax = !isNaN(userYMax) ? userYMax : calculatedMax;
 
-            const showYTicks = document.getElementById('y-ticks-show').checked;
-            const yTickDir = document.getElementById('tick-direction').value;
-            const yMajorTickLen = parseFloat(document.getElementById('tick-length').value) || 4;
-            
-            const showXTicks = document.getElementById('x-ticks-show').checked;
-            const xTickDir = document.getElementById('x-tick-direction').value;
-            const xMajorTickLen = parseFloat(document.getElementById('x-tick-length').value) || 4;
+
+
+			let ticks = [];
+			let effectiveStep = 1;
+
+			if (isLogScale) {
+				const minExp = Math.floor(Math.log10(Math.max(1e-10, yMin)));
+				const maxExp = Math.ceil(Math.log10(Math.max(1e-10, yMax)));
+				for (let exp = minExp; exp <= maxExp; exp++) {
+					const val = Math.pow(10, exp);
+					if (val >= yMin * 0.99 && val <= yMax * 1.01) ticks.push(val);
+				}
+				if (ticks.length < 2) {
+					ticks = [Math.pow(10, minExp), Math.pow(10, maxExp + 1)];
+				}
+			} else {
+				const niceAuto = calculateNiceTicks(yMin, yMax, 5);
+				effectiveStep = niceAuto.step;
+				if (!isNaN(userYStep) && userYStep > 0) {
+					effectiveStep = userYStep;
+					const firstTick = Math.ceil(yMin / userYStep) * userYStep;
+					for (let t = firstTick; t <= yMax + 1e-9; t += userYStep) {
+						ticks.push(parseFloat(t.toFixed(6)));
+					}
+				} else {
+					// Re-anchor the nice step to the actual range so we never emit
+					// ticks outside [yMin, yMax] when the user pinned a bound.
+					const firstTick = Math.ceil(yMin / effectiveStep) * effectiveStep;
+					for (let t = firstTick; t <= yMax + 1e-9; t += effectiveStep) {
+						ticks.push(parseFloat(t.toFixed(6)));
+					}
+				}
+				if (yMin <= 0 && yMax >= 0 && !ticks.some(t => Math.abs(t) < 1e-9)) {
+					ticks.push(0);
+					ticks.sort((a, b) => a - b);
+				}
+			}
+
+			userYMinInput.placeholder  = `${calculatedMin}`;
+			userYMaxInput.placeholder  = `${calculatedMax}`;
+			userYStepInput.placeholder = `${effectiveStep}`;
+			if (yMinIsAuto)  userYMinInput.value  = calculatedMin;
+			if (yMaxIsAuto)  userYMaxInput.value  = calculatedMax;
+			if (yStepIsAuto) userYStepInput.value = effectiveStep;
+			
+			const showYTicks = document.getElementById('y-ticks-show').checked;
+			const yTickDir = document.getElementById('tick-direction').value;
+			const yMajorTickLen = parseFloat(document.getElementById('tick-length').value) || 4;
+
+			const showXTicks = document.getElementById('x-ticks-show').checked;
+			const xTickDir = document.getElementById('x-tick-direction').value;
+			const xMajorTickLen = parseFloat(document.getElementById('x-tick-length').value) || 4;
 			const showBox = document.getElementById('box-figure').checked;
 
+			const showMinorTicks = document.getElementById('minor-ticks-show').checked;
+			const minorSubdiv = parseInt(document.getElementById('minor-tick-count').value) + 1;
+			const minorTickLen = parseFloat(document.getElementById('minor-tick-length').value) || 2.5;
 
-            const showMinorTicks = document.getElementById('minor-ticks-show').checked;
-            const minorSubdiv = parseInt(document.getElementById('minor-tick-count').value) + 1;
-            const minorTickLen = parseFloat(document.getElementById('minor-tick-length').value) || 2.5;
+			const yScale = (val) => {
+				const safeVal = Math.max(isLogScale ? 1e-10 : -Infinity, val);
+				if (isLogScale) {
+					const lMin = Math.log10(Math.max(1e-10, yMin));
+					const lMax = Math.log10(Math.max(1e-10, yMax));
+					const lVal = Math.log10(Math.max(1e-10, safeVal));
+					return margin.top + plotHeight - ((lVal - lMin) / (lMax - lMin || 1)) * plotHeight;
+				}
+				return margin.top + plotHeight - ((safeVal - yMin) / (yMax - yMin || 1)) * plotHeight;
+			};
 
-            const yScale = (val) => {
-                const safeVal = Math.max(isLogScale ? 1e-10 : -Infinity, val);
-                if (isLogScale) {
-                    const lMin = Math.log10(Math.max(1e-10, yMin));
-                    const lMax = Math.log10(Math.max(1e-10, yMax));
-                    const lVal = Math.log10(Math.max(1e-10, safeVal));
-                    return margin.top + plotHeight - ((lVal - lMin) / (lMax - lMin || 1)) * plotHeight;
-                }
-                return margin.top + plotHeight - ((safeVal - yMin) / (yMax - yMin || 1)) * plotHeight;
-            };
+			// ← PATCH: baseline is where bars are anchored. Normally y=0, but if the user
+			// forced a range entirely above or below zero, anchor to the nearest edge.
+			let baselineValue = 0;
+			if (yMin > 0) baselineValue = yMin;
+			else if (yMax < 0) baselineValue = yMax;
+			const baselineY = yScale(baselineValue);
 
-            const legendVisible = showLegend && subGroups.length > 0 && !(subGroups.length === 1 && subGroups[0] === 'Default');
-            let legendDim = { w: 0, h: 0 };
-            if (legendVisible) {
-                const swatch = baseFontSize;
-                const rowH = swatch + legendItemGap;
-                let maxTextWidth = legendTitle ? legendTitle.replace(/<[^>]+>/g, '').length * (baseFontSize * 0.6) : 0;
-                subGroups.forEach(g => {
-                    const cleanG = g.replace(/<[^>]+>/g, '');
-                    const w = cleanG.length * (baseFontSize * 0.55) + swatch + 15;
-                    if (w > maxTextWidth) maxTextWidth = w;
-                });
-                legendDim = {
-                    w: Math.max(90, Math.round(maxTextWidth + 12)),
-                    h: Math.round((legendTitle ? baseFontSize + legendTitleGap : 6) + (subGroups.length * rowH) + 4)
-                };
-            }
+			// ← PATCH: draw a line at y=0 when bars sit on both sides of it.
+			const hasPositiveBars = summaryStats.some(s => s.mean > 0);
+			const hasNegativeBars = summaryStats.some(s => s.mean < 0);
+			const showZeroLine = hasPositiveBars && hasNegativeBars && yMin < 0 && yMax > 0 && !isLogScale;
+			const zeroY = showZeroLine ? yScale(0) : null;
 
-            if (!isLegendManuallyMoved) {
-                legendPos = {
-                    x: Math.round(margin.left + plotWidth - legendDim.w - 6),
-                    y: Math.round(margin.top + 6)
-                };
-            }
+			// Reversed range: keep the last good chart visible, show an inline error,
+			// and bail out before touching the SVG.
+			if (yMax <= yMin) {
+				setYRangeError(`y-max (${yMax}) must be greater than y-min (${yMin}).`);
+				return;
+			}
+			setYRangeError('');
 
-            let svgContent = `
-                <defs>
-                    <pattern id="pattern-diag-right" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
-                        <line x1="0" y1="0" x2="0" y2="8" stroke="${barStrokeColor}" stroke-width="${strokeWidth * 1.2}" />
-                    </pattern>
-                    <pattern id="pattern-diag-left" width="8" height="8" patternTransform="rotate(-45 0 0)" patternUnits="userSpaceOnUse">
-                        <line x1="0" y1="0" x2="0" y2="8" stroke="${barStrokeColor}" stroke-width="${strokeWidth * 1.2}" />
-                    </pattern>
-                    <pattern id="pattern-crosshatch" width="8" height="8" patternUnits="userSpaceOnUse">
-                        <path d="M 0 0 L 8 8 M 8 0 L 0 8" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
-                    </pattern>
-                    <pattern id="pattern-dots" width="8" height="8" patternUnits="userSpaceOnUse">
-                        <circle cx="4" cy="4" r="1.2" fill="${barStrokeColor}" />
-                    </pattern>
+			if (!yMaxIsAuto) {
+				let above = 0;
+				summaryStats.forEach(s => { if (s.mean + s.errPlus > yMax + 1e-9) above++; });
+				if (above > 0) rangeWarnings.push(`${above} bar${above === 1 ? '' : 's'} exceed the fixed y-max (${yMax})`);
+			}
+			if (!yMinIsAuto) {
+				let below = 0;
+				summaryStats.forEach(s => { if (s.mean - s.errMinus < yMin - 1e-9) below++; });
+				if (below > 0) rangeWarnings.push(`${below} bar${below === 1 ? '' : 's'} fall below the fixed y-min (${yMin})`);
+			}
+
+			const legendVisible = showLegend && subGroups.length > 0 && !(subGroups.length === 1 && subGroups[0] === 'Default');
+			let legendDim = { w: 0, h: 0 };
+			if (legendVisible) {
+				const swatch = baseFontSize;
+				const rowH = swatch + legendItemGap;
+				let maxTextWidth = legendTitle ? legendTitle.replace(/<[^>]+>/g, '').length * (baseFontSize * 0.6) : 0;
+				subGroups.forEach(g => {
+					const cleanG = g.replace(/<[^>]+>/g, '');
+					const w = cleanG.length * (baseFontSize * 0.55) + swatch + 15;
+					if (w > maxTextWidth) maxTextWidth = w;
+				});
+				legendDim = {
+					w: Math.max(90, Math.round(maxTextWidth + 12)),
+					h: Math.round((legendTitle ? baseFontSize + legendTitleGap : 6) + (subGroups.length * rowH) + 4)
+				};
+			}
+
+			if (!isLegendManuallyMoved) {
+				legendPos = {
+					x: Math.round(margin.left + plotWidth - legendDim.w - 6),
+					y: Math.round(margin.top + 6)
+				};
+			}
+
+			let svgContent = `
+				<defs>
+					<pattern id="pattern-diag-right" width="8" height="8" patternTransform="rotate(45 0 0)" patternUnits="userSpaceOnUse">
+						<line x1="0" y1="0" x2="0" y2="8" stroke="${barStrokeColor}" stroke-width="${strokeWidth * 1.2}" />
+					</pattern>
+					<pattern id="pattern-diag-left" width="8" height="8" patternTransform="rotate(-45 0 0)" patternUnits="userSpaceOnUse">
+						<line x1="0" y1="0" x2="0" y2="8" stroke="${barStrokeColor}" stroke-width="${strokeWidth * 1.2}" />
+					</pattern>
+					<pattern id="pattern-crosshatch" width="8" height="8" patternUnits="userSpaceOnUse">
+						<path d="M 0 0 L 8 8 M 8 0 L 0 8" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
+					</pattern>
+					<pattern id="pattern-dots" width="8" height="8" patternUnits="userSpaceOnUse">
+						<circle cx="4" cy="4" r="1.2" fill="${barStrokeColor}" />
+					</pattern>
 					<clipPath id="plot-clip">
 						<rect x="${margin.left}" y="${margin.top}" width="${plotWidth}" height="${plotHeight}"/>
 					</clipPath>
-                </defs>
-                <style>.chart-text { font-family: ${font}; }</style>
-                <rect width="100%" height="100%" fill="#ffffff"/>
-            `;
+				</defs>
+				<style>.chart-text { font-family: ${font}; }</style>
+				<rect width="100%" height="100%" fill="#ffffff"/>
+			`;
 
-            let maxTickLabelWidth = 0;
+			let maxTickLabelWidth = 0;
 
-            svgContent += `<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">`;
-            svgContent += `<line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>`;
+			svgContent += `<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">`;
+			svgContent += `<line x1="${margin.left}" y1="${margin.top}" x2="${margin.left}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>`;
 
-            ticks.forEach((tickVal, idx) => {
-                const yPos = yScale(tickVal);
-                const str = tickVal.toString();
-                if (str.length > maxTickLabelWidth) maxTickLabelWidth = str.length;
+			ticks.forEach((tickVal, idx) => {
+				const yPos = yScale(tickVal);
+				const str = tickVal.toString();
+				if (str.length > maxTickLabelWidth) maxTickLabelWidth = str.length;
 
-                let x1 = margin.left, x2 = margin.left;
-                if (yTickDir === 'outer' || yTickDir === 'both') x1 = margin.left - yMajorTickLen;
-                if (yTickDir === 'inner' || yTickDir === 'both') x2 = margin.left + yMajorTickLen;
+				let x1 = margin.left, x2 = margin.left;
+				if (yTickDir === 'outer' || yTickDir === 'both') x1 = margin.left - yMajorTickLen;
+				if (yTickDir === 'inner' || yTickDir === 'both') x2 = margin.left + yMajorTickLen;
 
-                if (showYTicks) {
-                    svgContent += `<line x1="${x1}" y1="${yPos}" x2="${x2}" y2="${yPos}" stroke="#000000" stroke-width="${strokeWidth}"/>`;
-                }
+				if (showYTicks) {
+					svgContent += `<line x1="${x1}" y1="${yPos}" x2="${x2}" y2="${yPos}" stroke="#000000" stroke-width="${strokeWidth}"/>`;
+				}
 
-                svgContent += `<text x="${margin.left - Math.max(7, (showYTicks && (yTickDir === 'outer' || yTickDir === 'both') ? yMajorTickLen + 3 : 5))}" y="${yPos + 3.5}" font-size="${baseFontSize - 1}" text-anchor="end" fill="#000000" class="chart-text">${tickVal}</text>`;
+				svgContent += `<text x="${margin.left - Math.max(7, (showYTicks && (yTickDir === 'outer' || yTickDir === 'both') ? yMajorTickLen + 3 : 5))}" y="${yPos + 3.5}" font-size="${baseFontSize - 1}" text-anchor="end" fill="#000000" class="chart-text">${tickVal}</text>`;
 
-                if (showYTicks && showMinorTicks) {
-                    if (isLogScale && idx < ticks.length - 1) {
-                        const curDecade = ticks[idx];
-                        for (let m = 2; m <= 9; m++) {
-                            const mVal = curDecade * m;
-                            if (mVal <= yMax) {
-                                const mY = yScale(mVal);
-                                let mx1 = margin.left, mx2 = margin.left;
-                                if (yTickDir === 'outer' || yTickDir === 'both') mx1 = margin.left - minorTickLen;
-                                if (yTickDir === 'inner' || yTickDir === 'both') mx2 = margin.left + minorTickLen;
-                                svgContent += `<line x1="${mx1}" y1="${mY}" x2="${mx2}" y2="${mY}" stroke="#000000" stroke-width="${Math.max(0.6, strokeWidth * 0.75)}"/>`;
-                            }
-                        }
-                    } else if (!isLogScale && idx < ticks.length - 1) {
-                        const nextVal = ticks[idx + 1];
-                        const stepDiff = (nextVal - tickVal) / minorSubdiv;
-                        for (let m = 1; m < minorSubdiv; m++) {
-                            const mVal = tickVal + stepDiff * m;
-                            const mY = yScale(mVal);
-                            let mx1 = margin.left, mx2 = margin.left;
-                            if (yTickDir === 'outer' || yTickDir === 'both') mx1 = margin.left - minorTickLen;
-                            if (yTickDir === 'inner' || yTickDir === 'both') mx2 = margin.left + minorTickLen;
-                            svgContent += `<line x1="${mx1}" y1="${mY}" x2="${mx2}" y2="${mY}" stroke="#000000" stroke-width="${Math.max(0.6, strokeWidth * 0.75)}"/>`;
-                        }
-                    }
-                }
-            });
-            svgContent += `</g>`;
+				if (showYTicks && showMinorTicks) {
+					if (isLogScale && idx < ticks.length - 1) {
+						const curDecade = ticks[idx];
+						for (let m = 2; m <= 9; m++) {
+							const mVal = curDecade * m;
+							if (mVal <= yMax) {
+								const mY = yScale(mVal);
+								let mx1 = margin.left, mx2 = margin.left;
+								if (yTickDir === 'outer' || yTickDir === 'both') mx1 = margin.left - minorTickLen;
+								if (yTickDir === 'inner' || yTickDir === 'both') mx2 = margin.left + minorTickLen;
+								svgContent += `<line x1="${mx1}" y1="${mY}" x2="${mx2}" y2="${mY}" stroke="#000000" stroke-width="${Math.max(0.6, strokeWidth * 0.75)}"/>`;
+							}
+						}
+					} else if (!isLogScale && idx < ticks.length - 1) {
+						const nextVal = ticks[idx + 1];
+						const stepDiff = (nextVal - tickVal) / minorSubdiv;
+						for (let m = 1; m < minorSubdiv; m++) {
+							const mVal = tickVal + stepDiff * m;
+							const mY = yScale(mVal);
+							let mx1 = margin.left, mx2 = margin.left;
+							if (yTickDir === 'outer' || yTickDir === 'both') mx1 = margin.left - minorTickLen;
+							if (yTickDir === 'inner' || yTickDir === 'both') mx2 = margin.left + minorTickLen;
+							svgContent += `<line x1="${mx1}" y1="${mY}" x2="${mx2}" y2="${mY}" stroke="#000000" stroke-width="${Math.max(0.6, strokeWidth * 0.75)}"/>`;
+						}
+					}
+				}
+			});
+			svgContent += `</g>`;
 
 			const renderRefLine = (rl) => {
 				const yPos = yScale(rl.yVal);
@@ -1922,87 +2087,100 @@ function isMonoPalette() {
 			// Ref lines flagged "behind" (default) — drawn under the bars.
 			refLines.filter(rl => !rl.onTop).forEach(rl => { svgContent += renderRefLine(rl); });
 
-            const yTitleOffset = margin.left - (maxTickLabelWidth * (baseFontSize * 0.55) + 12);
-            const yTitlePos = axisTitlePos.y || { x: Math.round(Math.max(12, yTitleOffset)), y: Math.round(margin.top + plotHeight / 2) };
-            const xTitlePos = axisTitlePos.x || { x: Math.round(margin.left + plotWidth / 2), y: Math.round(margin.top + plotHeight + margin.bottom - 4) };
-            renderedTitlePos = { x: xTitlePos, y: yTitlePos };
+			const yTitleOffset = margin.left - (maxTickLabelWidth * (baseFontSize * 0.55) + 12);
+			const yTitlePos = axisTitlePos.y || { x: Math.round(Math.max(12, yTitleOffset)), y: Math.round(margin.top + plotHeight / 2) };
+			const xTitlePos = axisTitlePos.x || { x: Math.round(margin.left + plotWidth / 2), y: Math.round(margin.top + plotHeight + margin.bottom - 4) };
+			renderedTitlePos = { x: xTitlePos, y: yTitlePos };
 
-            svgContent += `
-                <g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'x-scale-wrapper')">
-                    <line x1="${margin.left}" y1="${margin.top + plotHeight}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
-                </g>
-                <g class="draggable-element axis-title-item clickable-chart-element" data-axis="y" onclick="navigateAndHighlight('annotations', 'y-title-wrapper')">
-                    <text transform="translate(${yTitlePos.x}, ${yTitlePos.y}) rotate(-90)" x="0" y="0" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(yTitleRaw, baseFontSize + 1, font)}</text>
-                </g>
-            `;
-			
+			svgContent += `
+				<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'x-scale-wrapper')">
+					<line x1="${margin.left}" y1="${margin.top + plotHeight}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
+				</g>
+				<g class="draggable-element axis-title-item clickable-chart-element" data-axis="y" onclick="navigateAndHighlight('annotations', 'y-title-wrapper')">
+					<text transform="translate(${yTitlePos.x}, ${yTitlePos.y}) rotate(-90)" x="0" y="0" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(yTitleRaw, baseFontSize + 1, font)}</text>
+				</g>
+			`;
+
 			if (showBox) {
-					svgContent += `
-						<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">
-							<line x1="${margin.left + plotWidth}" y1="${margin.top}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
-							<line x1="${margin.left}" y1="${margin.top}" x2="${margin.left + plotWidth}" y2="${margin.top}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
-						</g>
-					`;
+				svgContent += `
+					<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">
+						<line x1="${margin.left + plotWidth}" y1="${margin.top}" x2="${margin.left + plotWidth}" y2="${margin.top + plotHeight}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
+						<line x1="${margin.left}" y1="${margin.top}" x2="${margin.left + plotWidth}" y2="${margin.top}" stroke="#000000" stroke-width="${strokeWidth}" stroke-linecap="square"/>
+					</g>
+				`;
+			}
+
+			if (xTitleRaw.trim()) {
+				svgContent += `
+					<g class="draggable-element axis-title-item clickable-chart-element" data-axis="x" onclick="navigateAndHighlight('annotations', 'x-title-wrapper')">
+						<text x="${xTitlePos.x}" y="${xTitlePos.y}" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xTitleRaw, baseFontSize + 1, font)}</text>
+					</g>
+				`;
+			}
+
+			const numCats = xCategories.length || 1;
+			const xGroupWidth = plotWidth / numCats;
+			const usableWidth = xGroupWidth * (1 - groupPadding);
+			const subBarWidth = Math.max(2, (usableWidth - (innerGap * (subGroups.length - 1))) / subGroups.length);
+
+			xCategories.forEach((xCat, xIdx) => {
+				const groupStartX = margin.left + (xIdx * xGroupWidth) + (xGroupWidth * groupPadding / 2);
+				const xCenter = margin.left + (xIdx * xGroupWidth) + (xGroupWidth / 2);
+				const tickLabelGap = (showXTicks && (xTickDir === 'outer' || xTickDir === 'both')) ? xMajorTickLen + 2 : 4;
+
+				svgContent += `
+					<g class="clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')">
+						<text x="${xCenter}" y="${margin.top + plotHeight + baseFontSize + tickLabelGap}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xCat, baseFontSize, font)}</text>
+					</g>
+				`;
+
+				if (showXTicks) {
+					let y1 = margin.top + plotHeight, y2 = margin.top + plotHeight;
+					if (xTickDir === 'outer' || xTickDir === 'both') y2 = margin.top + plotHeight + xMajorTickLen;
+					if (xTickDir === 'inner' || xTickDir === 'both') y1 = margin.top + plotHeight - xMajorTickLen;
+					svgContent += `<line x1="${xCenter}" y1="${y1}" x2="${xCenter}" y2="${y2}" stroke="#000000" stroke-width="${strokeWidth}"/>`;
 				}
-				
-            if (xTitleRaw.trim()) {
-                svgContent += `
-                    <g class="draggable-element axis-title-item clickable-chart-element" data-axis="x" onclick="navigateAndHighlight('annotations', 'x-title-wrapper')">
-                        <text x="${xTitlePos.x}" y="${xTitlePos.y}" font-size="${baseFontSize + 1}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xTitleRaw, baseFontSize + 1, font)}</text>
-                    </g>
-                `;
-            }
 
-            const numCats = xCategories.length || 1;
-            const xGroupWidth = plotWidth / numCats;
-            const usableWidth = xGroupWidth * (1 - groupPadding);
-            const subBarWidth = Math.max(2, (usableWidth - (innerGap * (subGroups.length - 1))) / subGroups.length);
+				subGroups.forEach((subG, gIdx) => {
+					const stat = summaryStats.find(s => s.x === xCat && s.group === subG);
+					if (!stat) return;
 
-            xCategories.forEach((xCat, xIdx) => {
-                const groupStartX = margin.left + (xIdx * xGroupWidth) + (xGroupWidth * groupPadding / 2);
-                const xCenter = margin.left + (xIdx * xGroupWidth) + (xGroupWidth / 2);
-                const tickLabelGap = (showXTicks && (xTickDir === 'outer' || xTickDir === 'both')) ? xMajorTickLen + 2 : 4;
-                
-                svgContent += `
-                    <g class="clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')">
-                        <text x="${xCenter}" y="${margin.top + plotHeight + baseFontSize + tickLabelGap}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xCat, baseFontSize, font)}</text>
-                    </g>
-                `;
-                
-                if (showXTicks) {
-                    let y1 = margin.top + plotHeight, y2 = margin.top + plotHeight;
-                    if (xTickDir === 'outer' || xTickDir === 'both') y2 = margin.top + plotHeight + xMajorTickLen;
-                    if (xTickDir === 'inner' || xTickDir === 'both') y1 = margin.top + plotHeight - xMajorTickLen;
-                    svgContent += `<line x1="${xCenter}" y1="${y1}" x2="${xCenter}" y2="${y2}" stroke="#000000" stroke-width="${strokeWidth}"/>`;
-                }
+					const barX = groupStartX + (gIdx * (subBarWidth + innerGap));
 
-                subGroups.forEach((subG, gIdx) => {
-                    const stat = summaryStats.find(s => s.x === xCat && s.group === subG);
-                    if (!stat) return;
+					// ← PATCH: anchor bar to the baseline, not to the plot bottom.
+					// Positive bars grow up from baselineY; negative bars grow down.
+					const meanY = yScale(stat.mean);
+					const barTop    = Math.min(meanY, baselineY);
+					const barBottom = Math.max(meanY, baselineY);
+					const barY = barTop;
+					const barH = Math.max(0, barBottom - barTop);
 
-                    const barX = groupStartX + (gIdx * (subBarWidth + innerGap));
-                    const barY = yScale(stat.mean);
-                    const barH = (margin.top + plotHeight) - barY;
-                    
 					const isSingleSeries = subGroups.length === 1 && subGroups[0] === 'Default';
 					const style = resolveBarStyle(isSingleSeries, xIdx, gIdx);
-                    
-					svgContent += `<g clip-path="url(#plot-clip)">`;                      // ← NEW
+
+					svgContent += `<g clip-path="url(#plot-clip)">`;
 
 					svgContent += `
-                        <g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'series-customizer')">
-                            <rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
-                    `;
-                    if (style.pattern && style.pattern !== 'none') {
-                        svgContent += `<rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="url(#pattern-${style.pattern})" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
-                    }
-                    svgContent += `</g>`;
+						<g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'series-customizer')">
+							<rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>
+					`;
+					if (style.pattern && style.pattern !== 'none') {
+						svgContent += `<rect x="${barX}" y="${barY}" width="${subBarWidth}" height="${barH}" fill="url(#pattern-${style.pattern})" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
+					}
+					svgContent += `</g>`;
 
-					let topErrorY = barY;
+					// ← PATCH: error whisker spans the full [mean-err, mean+err] interval
+					// and is clipped by the plot, never clamped to yMin.
+					// The significance marker goes on whichever side is "outward" from the baseline.
+					let sigAnchorY = null;
 					if (stat.errPlus > 0 || stat.errMinus > 0) {
-						const topY = yScale(stat.mean + stat.errPlus);
-						topErrorY = Math.min(barY, topY);
-						const bottomY = yScale(Math.max(yMin, stat.mean - stat.errMinus));
+						const topVal    = stat.mean + stat.errPlus;
+						const bottomVal = stat.mean - stat.errMinus;
+						const topY    = yScale(topVal);
+						const bottomY = yScale(bottomVal);
+						const whiskerTop    = Math.min(topY, bottomY);
+						const whiskerBottom = Math.max(topY, bottomY);
+
 						const midX = barX + subBarWidth / 2;
 
 						// Cap length: 0 means "no caps" (bare whisker). Otherwise enforce a
@@ -2011,76 +2189,97 @@ function isMonoPalette() {
 
 						svgContent += `
 							<g class="clickable-chart-element" onclick="navigateAndHighlight('style', 'error-bars-wrapper')">
-								<line x1="${midX}" y1="${topY}" x2="${midX}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+								<line x1="${midX}" y1="${whiskerTop}" x2="${midX}" y2="${whiskerBottom}" stroke="#000000" stroke-width="${strokeWidth}"/>
 						`;
 						if (effectiveCapWidth > 0) {
 							svgContent += `
-								<line x1="${midX - effectiveCapWidth / 2}" y1="${topY}" x2="${midX + effectiveCapWidth / 2}" y2="${topY}" stroke="#000000" stroke-width="${strokeWidth}"/>
-								<line x1="${midX - effectiveCapWidth / 2}" y1="${bottomY}" x2="${midX + effectiveCapWidth / 2}" y2="${bottomY}" stroke="#000000" stroke-width="${strokeWidth}"/>
+								<line x1="${midX - effectiveCapWidth / 2}" y1="${whiskerTop}" x2="${midX + effectiveCapWidth / 2}" y2="${whiskerTop}" stroke="#000000" stroke-width="${strokeWidth}"/>
+								<line x1="${midX - effectiveCapWidth / 2}" y1="${whiskerBottom}" x2="${midX + effectiveCapWidth / 2}" y2="${whiskerBottom}" stroke="#000000" stroke-width="${strokeWidth}"/>
 							`;
 						}
 						svgContent += `</g>`;
+
+						// Marker sits just beyond whichever end of the whisker is farther from baseline.
+						sigAnchorY = stat.mean >= baselineValue ? whiskerTop : whiskerBottom;
+					} else {
+						sigAnchorY = stat.mean >= baselineValue ? barTop : barBottom;
 					}
-					svgContent += `</g>`;                                                  // ← NEW
+
+					svgContent += `</g>`;   // close plot-clip
 
 					if (stat.significance && stat.significance.trim()) {
 						const sigMidX = barX + subBarWidth / 2;
-						const sigY = topErrorY - 6;
+						const outward = stat.mean >= baselineValue ? -1 : 1;
+						// 6px gap, plus the text's own ascent/descent so it doesn't overlap the bar.
+						const sigY = outward < 0
+							? sigAnchorY - 6
+							: sigAnchorY + baseFontSize + 2;
 						svgContent += `
 							<g class="clickable-chart-element" onclick="navigateAndHighlight('data', 'data-table-wrap')">
 								<text x="${sigMidX}" y="${sigY}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" font-weight="bold" class="chart-text">${parseHTMLToSVG(stat.significance.trim(), baseFontSize, font)}</text>
 							</g>
 						`;
 					}
-                });
-            });
-			
+				});
+			});
+
+			// ← PATCH: solid line at y=0 when bars sit on both sides.
+			if (showZeroLine) {
+				svgContent += `
+					<g class="clickable-chart-element" onclick="navigateAndHighlight('annotations', 'y-scale-wrapper')">
+						<line x1="${margin.left}" y1="${zeroY}" x2="${margin.left + plotWidth}" y2="${zeroY}"
+							  stroke="#000000" stroke-width="${strokeWidth}"/>
+					</g>
+				`;
+			}
+
+
 			// Ref lines flagged "on top" — drawn over the bars but under the legend/annotations.
 			refLines.filter(rl => rl.onTop).forEach(rl => { svgContent += renderRefLine(rl); });
-			
-            if (legendVisible) {
-                const swatchSize = baseFontSize;
-                const rowHeight = swatchSize + legendItemGap;
-                const boxW = legendDim.w, boxH = legendDim.h;
 
-                svgContent += `<g class="draggable-element clickable-chart-element" id="legend-group" transform="translate(${legendPos.x}, ${legendPos.y})" onclick="navigateAndHighlight('annotations', 'legend-options-wrapper')">`;
-                if (showLegendBox) {
-                    svgContent += `<rect x="0" y="0" width="${boxW}" height="${boxH}" fill="#ffffff" stroke="#000000" stroke-width="${strokeWidth}" rx="2"/>`;
-                }
-                let currentY = 12;
-                if (legendTitle) {
-                    svgContent += `<text x="6" y="${currentY}" font-size="${baseFontSize - 1}" fill="#000000" class="chart-text">${parseHTMLToSVG(legendTitle, baseFontSize - 1, font)}</text>`;
-                    currentY += legendTitleGap;
-                }
-                subGroups.forEach((subG, idx) => {
-					// Legend swatches: in mono mode there's only one swatch, and it must
-					// reflect the live base color; otherwise use the series style.
+			if (legendVisible) {
+				const swatchSize = baseFontSize;
+				const rowHeight = swatchSize + legendItemGap;
+				const boxW = legendDim.w, boxH = legendDim.h;
+
+				svgContent += `<g class="draggable-element clickable-chart-element" id="legend-group" transform="translate(${legendPos.x}, ${legendPos.y})" onclick="navigateAndHighlight('annotations', 'legend-options-wrapper')">`;
+				if (showLegendBox) {
+					svgContent += `<rect x="0" y="0" width="${boxW}" height="${boxH}" fill="#ffffff" stroke="#000000" stroke-width="${strokeWidth}" rx="2"/>`;
+				}
+				let currentY = 12;
+				if (legendTitle) {
+					svgContent += `<text x="6" y="${currentY}" font-size="${baseFontSize - 1}" fill="#000000" class="chart-text">${parseHTMLToSVG(legendTitle, baseFontSize - 1, font)}</text>`;
+					currentY += legendTitleGap;
+				}
+				subGroups.forEach((subG, idx) => {
 					const style = isMonoPalette()
 						? { color: getMonoBaseColor(), pattern: 'none' }
 						: (seriesStyles[idx] || { color: '#3b82f6', pattern: 'none' });
-                    const swatchY = currentY - swatchSize + 2;
-                    svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
-                    if (style.pattern && style.pattern !== 'none') {
-                        svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="url(#pattern-${style.pattern})" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
-                    }
-                    svgContent += `<text x="${swatchSize + 14}" y="${currentY}" font-size="${baseFontSize - 1}" fill="#000000" class="chart-text">${parseHTMLToSVG(subG, baseFontSize - 1, font)}</text>`;
-                    currentY += rowHeight;
-                });
-                svgContent += `</g>`;
-            }
+					const swatchY = currentY - swatchSize + 2;
+					svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="${style.color}" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
+					if (style.pattern && style.pattern !== 'none') {
+						svgContent += `<rect x="6" y="${swatchY}" width="${swatchSize}" height="${swatchSize}" fill="url(#pattern-${style.pattern})" stroke="${barStrokeColor}" stroke-width="${strokeWidth}"/>`;
+					}
+					svgContent += `<text x="${swatchSize + 14}" y="${currentY}" font-size="${baseFontSize - 1}" fill="#000000" class="chart-text">${parseHTMLToSVG(subG, baseFontSize - 1, font)}</text>`;
+					currentY += rowHeight;
+				});
+				svgContent += `</g>`;
+			}
 
-            annotations.forEach(ann => {
-                const noteFont = ann.fontFamily || font;
-                svgContent += `
-                    <g class="draggable-element annotation-item clickable-chart-element" data-id="${ann.id}" onclick="navigateAndHighlight('annotations', 'annotation-field-${ann.id}')">
-                        <text x="${ann.x}" y="${ann.y}" font-size="${ann.fontSize}" fill="${ann.color}" text-anchor="middle" font-family="${noteFont}" style="font-family: ${noteFont};" class="chart-text">${parseHTMLToSVG(ann.text, ann.fontSize, noteFont)}</text>
-                    </g>
-                `;
-            });
+			annotations.forEach(ann => {
+				const noteFont = ann.fontFamily || font;
+				svgContent += `
+					<g class="draggable-element annotation-item clickable-chart-element" data-id="${ann.id}" onclick="navigateAndHighlight('annotations', 'annotation-field-${ann.id}')">
+						<text x="${ann.x}" y="${ann.y}" font-size="${ann.fontSize}" fill="${ann.color}" text-anchor="middle" font-family="${noteFont}" style="font-family: ${noteFont};" class="chart-text">${parseHTMLToSVG(ann.text, ann.fontSize, noteFont)}</text>
+					</g>
+				`;
+			});
 
-            svg.innerHTML = svgContent;
-            keepItemsVisible(svgWidth, svgHeight);
-        }
+			svg.innerHTML = svgContent;
+			keepItemsVisible(svgWidth, svgHeight);
+
+			setRangeWarning(rangeWarnings.length ? rangeWarnings.join(' ') : '');
+		}
 
         function resetAxisTitles() {
             axisTitlePos = { x: null, y: null };
