@@ -970,8 +970,6 @@ function isMonoPalette() {
         function parseHTMLToSVG(htmlStr, baseFontSize, font) {
             if (!htmlStr) return '';
             const small = Math.round(baseFontSize * 0.75);
-            const down = Math.round(baseFontSize * 0.25);
-            const up = Math.round(baseFontSize * 0.4);
 
             return String(htmlStr)
                 .replace(/&/g, '&amp;')
@@ -979,10 +977,11 @@ function isMonoPalette() {
                 .replace(/<i>(.*?)<\/i>/gi, '<tspan font-style="italic">$1</tspan>')
                 .replace(/<b>(.*?)<\/b>/gi, '<tspan font-weight="bold">$1</tspan>')
                 .replace(/<u>(.*?)<\/u>/gi, '<tspan text-decoration="underline">$1</tspan>')
-                .replace(/<sub>(.*?)<\/sub>/gi, `<tspan font-size="${small}" dy="${down}">$1</tspan><tspan dy="-${down}"></tspan>`)
-                .replace(/<sup>(.*?)<\/sup>/gi, `<tspan font-size="${small}" dy="-${up}">$1</tspan><tspan dy="${up}"></tspan>`);
+                .replace(/<sub>(.*?)<\/sub>/gi, `<tspan font-size="${small}" baseline-shift="sub">$1</tspan>`)
+                .replace(/<sup>(.*?)<\/sup>/gi, `<tspan font-size="${small}" baseline-shift="super">$1</tspan>`);
         }
-
+		
+		
         const SCI_GROUPS = [
             { name: 'Greek lowercase', items: [['\u03B1','alpha'],['\u03B2','beta'],['\u03B3','gamma'],['\u03B4','delta'],['\u03B5','epsilon'],['\u03B6','zeta'],['\u03B7','eta'],['\u03B8','theta'],['\u03B9','iota'],['\u03BA','kappa'],['\u03BB','lambda'],['\u03BC','mu'],['\u03BD','nu'],['\u03BE','xi'],['\u03BF','omicron'],['\u03C0','pi'],['\u03C1','rho'],['\u03C2','varsigma'],['\u03C3','sigma'],['\u03C4','tau'],['\u03C5','upsilon'],['\u03C6','phi'],['\u03C7','chi'],['\u03C8','psi'],['\u03C9','omega']] },
             { name: 'Greek uppercase', items: [['\u0391','Alpha'],['\u0392','Beta'],['\u0393','Gamma'],['\u0394','Delta'],['\u0395','Epsilon'],['\u0396','Zeta'],['\u0397','Eta'],['\u0398','Theta'],['\u0399','Iota'],['\u039A','Kappa'],['\u039B','Lambda'],['\u039C','Mu'],['\u039D','Nu'],['\u039E','Xi'],['\u039F','Omicron'],['\u03A0','Pi'],['\u03A1','Rho'],['\u03A3','Sigma'],['\u03A4','Tau'],['\u03A5','Upsilon'],['\u03A6','Phi'],['\u03A7','Chi'],['\u03A8','Psi'],['\u03A9','Omega']] },
@@ -1824,8 +1823,10 @@ function isMonoPalette() {
 				if (bottom < rawMinVal) rawMinVal = bottom;
 			});
 			// Guard against an empty dataset producing a zero-width range.
-			if (rawMaxVal === 0 && rawMinVal === 0) rawMaxVal = 10;
-
+			if (summaryStats.length === 0) {
+				rawMaxVal = 10;
+				rawMinVal = 0;
+			}
 			const userYMinInput = document.getElementById('y-min');
 			const userYMaxInput = document.getElementById('y-max');
 			const userYStepInput = document.getElementById('y-step');
@@ -1844,7 +1845,7 @@ function isMonoPalette() {
 			const rangeWarnings = [];
 			
 			let calculatedMin = isLogScale ? 1 : rawMinVal;
-			let calculatedMax = rawMaxVal === 0 ? 10 : rawMaxVal;
+			let calculatedMax = rawMaxVal;
 
 			if (isLogScale) {
 				const hasNonPositive = summaryStats.some(s => (s.mean - s.errMinus) <= 0 || s.mean <= 0);
@@ -1951,11 +1952,9 @@ function isMonoPalette() {
 			const baselineY = yScale(baselineValue);
 
 			// ← PATCH: draw a line at y=0 when bars sit on both sides of it.
-			const hasPositiveBars = summaryStats.some(s => s.mean > 0);
-			const hasNegativeBars = summaryStats.some(s => s.mean < 0);
-			const showZeroLine = hasPositiveBars && hasNegativeBars && yMin < 0 && yMax > 0 && !isLogScale;
+			const showZeroLine = yMin < 0 && yMax > 0 && !isLogScale;
 			const zeroY = showZeroLine ? yScale(0) : null;
-
+			
 			// Reversed range: keep the last good chart visible, show an inline error,
 			// and bail out before touching the SVG.
 			if (yMax <= yMin) {
