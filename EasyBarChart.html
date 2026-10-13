@@ -328,19 +328,28 @@
                     <div class="grid grid-cols-2 gap-2">
                         <div>
                             <label class="block text-[10px] text-slate-500">Top Margin (mm)</label>
-                            <input type="number" id="margin-top-mm" value="10" step="0.5" min="2" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <input type="number" id="margin-top-mm" value="5" step="0.5" min="1" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                         </div>
+						
                         <div>
                             <label class="block text-[10px] text-slate-500">Bottom Margin (mm)</label>
-                            <input type="number" id="margin-bottom-mm" value="10" step="0.5" min="5" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <div class="flex gap-1">
+                                <input type="number" id="margin-bottom-mm" data-auto="1" value="5" step="0.5" min="5" max="60"
+                                       onchange="updateChart()"
+                                       class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                                <button type="button" data-reset="margin-bottom-mm"
+                                        class="text-[11px] px-1.5 text-slate-400 hover:text-blue-600 border border-slate-300 rounded leading-none"
+                                        title="Reset to auto">&crarr;</button>
+                            </div>
                         </div>
+						
                         <div>
                             <label class="block text-[10px] text-slate-500">Left Margin (mm)</label>
-                            <input type="number" id="margin-left-mm" value="15" step="0.5" min="5" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <input type="number" id="margin-left-mm" value="10" step="0.5" min="1" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                         </div>
                         <div>
                             <label class="block text-[10px] text-slate-500">Right Margin (mm)</label>
-                            <input type="number" id="margin-right-mm" value="6" step="0.5" min="2" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                            <input type="number" id="margin-right-mm" value="5" step="0.5" min="1" max="60" onchange="updateChart()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
                         </div>
                     </div>
                 </div>
@@ -530,6 +539,23 @@
                         Show X-Axis Category Ticks
                     </label>
 
+                    <div class="border-t border-slate-100 pt-2 grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">X-Label Layout</label>
+                            <select id="x-label-mode" onchange="onXLabelModeChange()" class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                                <option value="wrap" selected>Wrap (default)</option>
+                                <option value="rotate45">Rotate 45°</option>
+                                <option value="rotate90">Rotate 90°</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-[10px] text-slate-500 mb-1">X-Label Gap (px)</label>
+                            <input type="number" id="x-label-gap" value="4" min="0" max="30" step="0.5"
+                                   onchange="updateChart()"
+                                   class="w-full text-xs p-1.5 border border-slate-300 rounded">
+                        </div>
+                    </div>
+
                     <div class="grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
                         <div>
                             <label class="block text-[10px] text-slate-500 mb-1">X-Tick Direction</label>
@@ -707,7 +733,7 @@
 
         let legendPos = { x: 260, y: 35 };
         let annotations = [{
-            id: 1, text: '<b>A</b>', x: 22, y: 24, fontSize: 14, color: '#000000', fontFamily: "Arial, Helvetica, sans-serif"
+            id: 1, text: '<b>A</b>', x: 10, y: 24, fontSize: 14, color: '#000000', fontFamily: "Arial, Helvetica, sans-serif"
         }];
         let refLines = [];
         let axisTitlePos = { x: null, y: null };   
@@ -981,6 +1007,24 @@ function isMonoPalette() {
                 .replace(/<sup>(.*?)<\/sup>/gi, `<tspan font-size="${small}" baseline-shift="super">$1</tspan>`);
         }
 		
+		function wrapText(text, maxCharsPerLine) {
+            const plain = String(text).replace(/<[^>]+>/g, '').trim();
+            if (!plain) return [''];
+            const words = plain.split(/\s+/);
+            const lines = [];
+            let current = '';
+            words.forEach(w => {
+                if (!current) { current = w; return; }
+                if ((current + ' ' + w).length <= maxCharsPerLine) {
+                    current += ' ' + w;
+                } else {
+                    lines.push(current);
+                    current = w;
+                }
+            });
+            if (current) lines.push(current);
+            return lines;
+        }
 		
         const SCI_GROUPS = [
             { name: 'Greek lowercase', items: [['\u03B1','alpha'],['\u03B2','beta'],['\u03B3','gamma'],['\u03B4','delta'],['\u03B5','epsilon'],['\u03B6','zeta'],['\u03B7','eta'],['\u03B8','theta'],['\u03B9','iota'],['\u03BA','kappa'],['\u03BB','lambda'],['\u03BC','mu'],['\u03BD','nu'],['\u03BE','xi'],['\u03BF','omicron'],['\u03C0','pi'],['\u03C1','rho'],['\u03C2','varsigma'],['\u03C3','sigma'],['\u03C4','tau'],['\u03C5','upsilon'],['\u03C6','phi'],['\u03C7','chi'],['\u03C8','psi'],['\u03C9','omega']] },
@@ -1001,11 +1045,27 @@ function isMonoPalette() {
             document.getElementById('sci-picker-body').innerHTML = html;
         }
 
-		const AUTO_FIELD_IDS = ['y-min', 'y-max', 'y-step'];
+		function onXLabelModeChange() {
+			// The auto-grown bottom margin is tuned for the previous label mode.
+			// Reset it to auto so the measurement re-runs from the minimum and
+			// settles on a value appropriate for the new mode.
+			const marginBottomInput = document.getElementById('margin-bottom-mm');
+			if (marginBottomInput.dataset.auto !== '0') {
+				marginBottomInput.value = '';
+			}
+			updateChart();
+		}
+
+
+
+
+
+		const AUTO_FIELD_IDS = ['y-min', 'y-max', 'y-step', 'margin-bottom-mm'];
 
 		function setupAutoFields() {
 			AUTO_FIELD_IDS.forEach(id => {
 				const el = document.getElementById(id);
+
 				if (!el) return;
 
 				// Any typing, pasting, or spinner click means "user wants control."
@@ -1359,6 +1419,19 @@ function isMonoPalette() {
             });
 
             if (!used.x) { const j = roles.indexOf('ignore'); if (j >= 0) assign(j, 'x'); }
+
+            // A subgroup with no category is nonsensical. If the guesser assigned
+            // a group but no x — usually because the header matched the group
+            // regex before the x-fallback could claim the column — promote the
+            // group column to be the category.
+            if (!used.x && used.group) {
+                const gj = roles.indexOf('group');
+                if (gj >= 0) {
+                    roles[gj] = 'x';
+                    used.x = true;
+                    delete used.group;
+                }
+            }
             return roles;
         }
 
@@ -1580,8 +1653,12 @@ function isMonoPalette() {
             if (residual > 7) niceStep = 10 * mag;
 
             const niceMin = Math.floor(min / niceStep) * niceStep;
-            const niceMax = Math.ceil(max / niceStep) * niceStep;
-
+			
+			const exactTick = Math.abs(max / niceStep - Math.round(max / niceStep)) < 1e-9;
+			const niceMax = exactTick
+				? Math.round(max / niceStep) * niceStep + niceStep * 0.
+				: Math.ceil(max / niceStep) * niceStep;
+				
             const ticks = [];
             for (let t = niceMin; t <= niceMax + (niceStep * 0.00001); t += niceStep) {
                 ticks.push(parseFloat(t.toFixed(4)));
@@ -1778,9 +1855,16 @@ function isMonoPalette() {
 			svg.setAttribute('viewBox', `0 0 ${svgWidth} ${svgHeight}`);
 			applyZoom(svgWidth, svgHeight);
 
+			const marginBottomInput = document.getElementById('margin-bottom-mm');
+		
+
+			const marginBottomIsAuto = marginBottomInput.dataset.auto !== '0';
+
 			let margin = {
 				top: Math.round((parseFloat(document.getElementById('margin-top-mm').value) || 10) * MM_TO_PX),
-				bottom: Math.round((parseFloat(document.getElementById('margin-bottom-mm').value) || 10) * MM_TO_PX),
+				bottom: Math.round((parseFloat(marginBottomInput.value) || 5) * MM_TO_PX),
+				
+				
 				left: Math.round((parseFloat(document.getElementById('margin-left-mm').value) || 15) * MM_TO_PX),
 				right: Math.round((parseFloat(document.getElementById('margin-right-mm').value) || 6) * MM_TO_PX)
 			};
@@ -1912,6 +1996,9 @@ function isMonoPalette() {
 					ticks.sort((a, b) => a - b);
 				}
 			}
+
+
+
 
 			userYMinInput.placeholder  = `${calculatedMin}`;
 			userYMaxInput.placeholder  = `${calculatedMax}`;
@@ -2122,16 +2209,57 @@ function isMonoPalette() {
 			const usableWidth = xGroupWidth * (1 - groupPadding);
 			const subBarWidth = Math.max(2, (usableWidth - (innerGap * (subGroups.length - 1))) / subGroups.length);
 
+			// X-label layout parameters
+			const xLabelMode = document.getElementById('x-label-mode').value;
+			const approxCharWidth = baseFontSize * 0.55;
+			const availablePx = xGroupWidth * 0.95;
+			const maxCharsPerLine = Math.max(6, Math.floor(availablePx / approxCharWidth));
+
+
 			xCategories.forEach((xCat, xIdx) => {
 				const groupStartX = margin.left + (xIdx * xGroupWidth) + (xGroupWidth * groupPadding / 2);
 				const xCenter = margin.left + (xIdx * xGroupWidth) + (xGroupWidth / 2);
 				const tickLabelGap = (showXTicks && (xTickDir === 'outer' || xTickDir === 'both')) ? xMajorTickLen + 2 : 4;
 
-				svgContent += `
-					<g class="clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')">
-						<text x="${xCenter}" y="${margin.top + plotHeight + baseFontSize + tickLabelGap}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" class="chart-text">${parseHTMLToSVG(xCat, baseFontSize, font)}</text>
-					</g>
-				`;
+
+				
+				const xLabelMode = document.getElementById('x-label-mode').value;
+				const userGap = parseFloat(document.getElementById('x-label-gap').value) || 0;
+				const labelBaseY = margin.top + plotHeight + userGap + baseFontSize;
+
+				if (xLabelMode === 'wrap') {
+					const lines = wrapText(xCat, maxCharsPerLine);
+					const lineHeight = baseFontSize * 1.1;
+					const tspans = lines.map((line, li) =>
+						`<tspan x="${xCenter}" dy="${li === 0 ? 0 : lineHeight}">${esc(line)}</tspan>`
+					).join('');
+					svgContent += `
+						<g class="x-label-item clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')">
+							<text x="${xCenter}" y="${labelBaseY}" font-size="${baseFontSize}" text-anchor="middle" fill="#000000" class="chart-text">${tspans}</text>
+						</g>
+					`;
+				} else if (xLabelMode === 'rotate45') {
+					// Anchor the rotated text at a small fixed offset below the axis.
+					// Its closest glyph corner ends up right next to the tick.
+					const anchorY = margin.top + plotHeight + userGap + 1;
+					svgContent += `
+						<g class="x-label-item clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')">
+							<text x="${xCenter}" y="${anchorY}" font-size="${baseFontSize}" text-anchor="end" fill="#000000" class="chart-text"
+							      transform="rotate(-45 ${xCenter} ${anchorY})">${parseHTMLToSVG(xCat, baseFontSize, font)}</text>
+						</g>
+					`;
+				} else {
+					// rotate90
+					const anchorY = margin.top + plotHeight + userGap + 1;
+					svgContent += `
+						<g class="x-label-item clickable-chart-element" onclick="navigateAndHighlight('data', 'tab-data')">
+							<text x="${xCenter}" y="${anchorY}" font-size="${baseFontSize}" text-anchor="end" fill="#000000" class="chart-text"
+							      transform="rotate(-90 ${xCenter} ${anchorY})">${parseHTMLToSVG(xCat, baseFontSize, font)}</text>
+						</g>
+					`;
+				}
+				
+				
 
 				if (showXTicks) {
 					let y1 = margin.top + plotHeight, y2 = margin.top + plotHeight;
@@ -2276,6 +2404,35 @@ function isMonoPalette() {
 
 			svg.innerHTML = svgContent;
 			keepItemsVisible(svgWidth, svgHeight);
+
+			// --- Measurement-based bottom margin auto-fit ---------------------
+			// Ask the DOM how much vertical room the x-labels actually need.
+			// Only auto-grow when the user hasn't pinned the bottom margin.
+			if (marginBottomIsAuto && !updateChart._adjustingMargin) {
+				const labels = svg.querySelectorAll('.x-label-item');
+				let maxBottom = 0;
+				labels.forEach(el => {
+					try {
+						const bb = el.getBBox();
+						const bottom = bb.y + bb.height;
+						if (bottom > maxBottom) maxBottom = bottom;
+					} catch (e) { /* getBBox can throw if detached */ }
+				});
+
+				const pad = 2;
+				const neededPx = Math.ceil(maxBottom + pad);
+				if (neededPx > svgHeight) {
+					// Convert the overflow in pixels back to mm and grow the margin.
+					const overflowMm = (neededPx - svgHeight) / MM_TO_PX;
+					const currentMm = margin.bottom / MM_TO_PX;
+					const newMm = Math.ceil((currentMm + overflowMm) * 2) / 2;  // round to nearest 0.5mm
+					marginBottomInput.value = newMm;
+					updateChart._adjustingMargin = true;
+					updateChart();
+					updateChart._adjustingMargin = false;
+					return;
+				}
+			}
 
 			setRangeWarning(rangeWarnings.length ? rangeWarnings.join(' ') : '');
 		}
@@ -2527,6 +2684,8 @@ refLines.push({ id: newId, yVal: defaultRefLineY(), strokeDash: 'dashed', color:
                 legendTitleGap: document.getElementById('legend-title-gap').value,
                 widthMm: document.getElementById('svg-width-mm').value,
                 heightMm: document.getElementById('svg-height-mm').value,
+				xLabelMode: document.getElementById('x-label-mode').value,
+				xLabelGap: document.getElementById('x-label-gap').value,
                 yLogScale: document.getElementById('y-log-scale').checked,
                 seriesStyles: seriesStyles,
                 categoryStyles: categoryStyles,
@@ -2552,6 +2711,8 @@ refLines.push({ id: newId, yVal: defaultRefLineY(), strokeDash: 'dashed', color:
             }
             if (cfg.seriesStyles) seriesStyles = cfg.seriesStyles;
             if (cfg.categoryStyles) categoryStyles = cfg.categoryStyles;
+			if (cfg.xLabelMode) document.getElementById('x-label-mode').value = cfg.xLabelMode;
+			if (cfg.xLabelMode) document.getElementById('x-label-mode').value = cfg.xLabelMode;
             if (cfg.annotations) { annotations = cfg.annotations; renderAnnotationsList(); }
             if (cfg.refLines) { refLines = cfg.refLines; renderRefLinesList(); }
 			updatePalettePreview();
